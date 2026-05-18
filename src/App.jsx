@@ -3,6 +3,7 @@ import {
   loadConfig,
   saveConfig,
   exportConfig,
+  copyConfig,
   importConfig,
 } from "./config";
 import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
@@ -317,13 +318,33 @@ function PositionsPanel({ config, onUpdate }) {
    Export / Import
    ════════════════════════════════════════ */
 function ExportImport({ config, onImport }) {
+  const [copied, setCopied] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const json = JSON.stringify(config, null, 2);
+
+  const handleCopy = () => {
+    copyConfig(config);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    exportConfig(config);
+    setDownloaded(true);
+    setTimeout(() => setDownloaded(false), 2000);
+  };
+
   return (
     <div className="export-section">
-      <p>将配置导出为 JSON 文件，或从之前导出的文件导入恢复配置。</p>
-      <button className="btn btn-primary" onClick={() => exportConfig(config)}>
-        📥 导出配置
-      </button>
+      <p>将配置复制到剪贴板或下载为 JSON 文件，也可从文件导入恢复。</p>
+      <div className="btn-row">
+        <button className="btn btn-primary" onClick={handleCopy}>
+          {copied ? "✅ 已复制" : "📋 复制配置"}
+        </button>
+        <button className="btn" onClick={handleDownload}>
+          {downloaded ? "✅ 已下载" : "📥 下载配置"}
+        </button>
+      </div>
 
       <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>当前配置预览</h3>
       <pre>{json}</pre>
