@@ -5,6 +5,7 @@ import {
   exportConfig,
   copyConfig,
   importConfig,
+  importConfigFromText,
 } from "./config";
 import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
 import "./App.css";
@@ -145,7 +146,7 @@ export default function App() {
           <PositionsPanel config={config} onUpdate={updatePosition} />
         )}
         {tab === "export" && (
-          <ExportImport config={config} onImport={handleImport} />
+          <ExportImport config={config} onImport={handleImport} setStatus={setStatus} onImportFromText={(data) => { setConfig(data); setStatus("✅ 配置已导入"); }} />
         )}
 
         {/* Worker Modal */}
@@ -317,9 +318,10 @@ function PositionsPanel({ config, onUpdate }) {
 /* ════════════════════════════════════════
    Export / Import
    ════════════════════════════════════════ */
-function ExportImport({ config, onImport }) {
+function ExportImport({ config, onImport, onImportFromText, setStatus }) {
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [pasteText, setPasteText] = useState("");
   const json = JSON.stringify(config, null, 2);
 
   const handleCopy = () => {
@@ -332,6 +334,16 @@ function ExportImport({ config, onImport }) {
     exportConfig(config);
     setDownloaded(true);
     setTimeout(() => setDownloaded(false), 2000);
+  };
+
+  const handlePasteImport = () => {
+    try {
+      const data = importConfigFromText(pasteText);
+      onImportFromText(data);
+      setPasteText("");
+    } catch (err) {
+      setStatus(`❌ 导入失败: ${err.message}`);
+    }
   };
 
   return (
@@ -350,11 +362,23 @@ function ExportImport({ config, onImport }) {
       <pre>{json}</pre>
 
       <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>导入配置</h3>
-      <div className="import-area">
+      <textarea
+        className="import-textarea"
+        rows={6}
+        placeholder="在此粘贴 JSON 配置，或从下方选择文件..."
+        value={pasteText}
+        onChange={(e) => setPasteText(e.target.value)}
+      />
+      <div className="btn-row" style={{ marginTop: 8 }}>
+        <button className="btn btn-primary" onClick={handlePasteImport} disabled={!pasteText.trim()}>
+          📥 从粘贴导入
+        </button>
+      </div>
+      <div className="import-area" style={{ marginTop: 12 }}>
         <input type="file" accept=".json" onChange={onImport} id="import-input" />
         <label htmlFor="import-input" style={{ cursor: "pointer", display: "block" }}>
           <p style={{ fontSize: 32, marginBottom: 4 }}>📂</p>
-          <p>点击选择 JSON 配置文件</p>
+          <p>或点击选择 JSON 配置文件</p>
         </label>
       </div>
     </div>
