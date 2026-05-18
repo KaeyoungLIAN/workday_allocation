@@ -44,15 +44,31 @@ export function importConfig(file) {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (!data.positions || !data.workers) {
-          reject(new Error("Invalid config format"));
-          return;
+        try {
+          resolve(validateAndResolve(data));
+        } catch (err) {
+          reject(err);
         }
-        resolve(data);
       } catch {
         reject(new Error("Invalid JSON"));
       }
     };
     reader.readAsText(file);
   });
+}
+
+export function importConfigFromText(text) {
+  try {
+    const data = JSON.parse(text);
+    return validateAndResolve(data);
+  } catch (err) {
+    throw err.message ? err : new Error("Invalid JSON");
+  }
+}
+
+function validateAndResolve(data) {
+  if (!data.positions || !data.workers) {
+    throw new Error("Invalid config format");
+  }
+  return data;
 }
