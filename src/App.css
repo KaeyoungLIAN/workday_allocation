@@ -190,6 +190,16 @@ body {
 .import-area p { font-size: 13px; color: var(--text-secondary); }
 .import-area input { display: none; }
 
+.import-textarea {
+  width: 100%; padding: 10px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg);
+  color: var(--text); font-size: 12px; font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  outline: none; resize: vertical; box-sizing: border-box;
+  transition: border-color 200ms;
+}
+.import-textarea:focus { border-color: var(--accent); }
+.import-textarea::placeholder { color: var(--text-muted); }
+
 /* ── Status bar ── */
 .status-bar {
   display: flex; align-items: center; gap: 8px;
