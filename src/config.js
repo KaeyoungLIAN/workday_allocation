@@ -34,6 +34,10 @@ export function exportConfig(config) {
   URL.revokeObjectURL(url);
 }
 
+export function copyConfig(config) {
+  navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+}
+
 export function importConfig(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
