@@ -1,0 +1,204 @@
+:root {
+  --bg: #0f0f14;
+  --surface: #1a1a24;
+  --surface-hover: #22222e;
+  --border: #2a2a3a;
+  --text: #e8e8ee;
+  --text-secondary: #9090a0;
+  --text-muted: #606070;
+  --accent: #6c5ce7;
+  --accent-hover: #7f71ed;
+  --accent-light: rgba(108, 92, 231, 0.15);
+  --green: #00b894;
+  --green-light: rgba(0, 184, 148, 0.15);
+  --red: #e17055;
+  --red-light: rgba(225, 112, 85, 0.12);
+  --amber: #fdcb6e;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 24px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.app-header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.app-header span { color: var(--text-secondary); font-size: 13px; }
+.tabs { display: flex; gap: 4px; }
+.tab-btn {
+  padding: 8px 16px; border: none; background: transparent;
+  color: var(--text-secondary); font-size: 13px; font-weight: 500;
+  cursor: pointer; border-radius: var(--radius-sm);
+  transition: all 200ms; font-family: inherit;
+}
+.tab-btn:hover { background: var(--surface-hover); color: var(--text); }
+.tab-btn.active { background: var(--accent-light); color: var(--accent); }
+
+.content { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+/* ── Schedule View ── */
+.schedule-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+  margin-top: 16px;
+}
+.day-col {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 12px; border: 1px solid var(--border);
+}
+.day-col h3 {
+  font-size: 13px; font-weight: 600; text-align: center;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--border); color: var(--text-secondary);
+}
+.pos-block { margin-bottom: 8px; }
+.pos-block:last-child { margin-bottom: 0; }
+.pos-label {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.pos-worker {
+  font-size: 12px; padding: 2px 6px; margin: 2px 0;
+  background: var(--accent-light); border-radius: 4px;
+  display: inline-block; color: var(--text);
+}
+.pos-worker.short { background: var(--red-light); color: var(--red); }
+
+.btn-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font-size: 13px;
+  font-family: inherit; cursor: pointer; transition: all 200ms;
+}
+.btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red-light); }
+.warning-badge {
+  display: inline-block; margin-top: 8px;
+  background: var(--amber); color: #1a1a24; 
+  font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm);
+}
+
+/* ── Workers Panel ── */
+.worker-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.worker-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px;
+}
+.worker-card .name { font-weight: 600; font-size: 14px; min-width: 80px; }
+.worker-card .tags { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.tag {
+  font-size: 11px; padding: 2px 8px; border-radius: 20px;
+  background: var(--accent-light); color: var(--accent);
+}
+.tag.off { background: var(--red-light); color: var(--red); }
+.tag.green { background: var(--green-light); color: var(--green); }
+.worker-card .actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* ── Modal / Form ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 24px;
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; width: 100%;
+  max-width: 440px; box-shadow: var(--shadow);
+}
+.modal h2 { font-size: 16px; margin-bottom: 16px; }
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block; font-size: 12px; font-weight: 500;
+  color: var(--text-secondary); margin-bottom: 4px;
+}
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg);
+  color: var(--text); font-size: 13px; font-family: inherit; outline: none;
+  transition: border-color 200ms;
+}
+.form-group input:focus { border-color: var(--accent); }
+.form-group .hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.checkbox-group { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.checkbox-btn {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 20px;
+  background: transparent; color: var(--text-secondary); font-size: 12px;
+  cursor: pointer; font-family: inherit; transition: all 200ms;
+}
+.checkbox-btn.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+/* ── Positions Panel ── */
+.pos-config-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.pos-config-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px;
+}
+.pos-config-card .color-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+}
+.pos-config-card .name-input {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 10px; background: var(--bg); color: var(--text);
+  font-size: 13px; font-family: inherit; width: 100px; outline: none;
+}
+.pos-config-card .name-input:focus { border-color: var(--accent); }
+.pos-config-card .staff-input {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 10px; background: var(--bg); color: var(--text);
+  font-size: 13px; font-family: inherit; width: 60px; text-align: center;
+  outline: none;
+}
+.pos-config-card .staff-input:focus { border-color: var(--accent); }
+.pos-config-card .label-text { font-size: 12px; color: var(--text-secondary); }
+
+/* ── Export/Import ── */
+.export-section { margin-top: 16px; }
+.export-section p { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.export-section pre {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; font-size: 12px;
+  max-height: 300px; overflow: auto; margin-bottom: 12px;
+  color: var(--text-secondary); white-space: pre-wrap;
+}
+.import-area {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 40px 20px; text-align: center; cursor: pointer;
+  transition: all 200ms; margin-top: 12px;
+}
+.import-area:hover { border-color: var(--accent); background: var(--accent-light); }
+.import-area p { font-size: 13px; color: var(--text-secondary); }
+.import-area input { display: none; }
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; background: var(--surface);
+  border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted);
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .schedule-grid { grid-template-columns: repeat(4, 1fr); }
+  .app-header { flex-wrap: wrap; gap: 12px; }
+}
