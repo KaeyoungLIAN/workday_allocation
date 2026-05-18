@@ -1,4 +1,4 @@
-const DAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 /**
  * Generate a schedule for one week.
@@ -11,13 +11,21 @@ export function generateSchedule(config) {
 
   for (let day = 0; day < 7; day++) {
     const daySchedule = {};
-    for (const pos of positions) {
+    const assignedToday = new Set(); // track workers already assigned today
+
+    // Process positions with highest demand first (most constrained)
+    const sorted = [...positions].sort((a, b) => b.minStaff - a.minStaff);
+
+    for (const pos of sorted) {
       const available = workers.filter(
         (w) =>
-          !w.offDays.includes(day) && w.positionIds.includes(pos.id)
+          !w.offDays.includes(day) &&
+          w.positionIds.includes(pos.id) &&
+          !assignedToday.has(w.id)
       );
       const shuffled = [...available].sort(() => Math.random() - 0.5);
       const assigned = shuffled.slice(0, pos.minStaff);
+      assigned.forEach((w) => assignedToday.add(w.id));
       daySchedule[pos.id] = assigned.map((w) => w.name);
     }
     schedule[day] = daySchedule;
