@@ -97,8 +97,8 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
-        <strong>平日优先级：</strong>大堂=现金柜员（雷打不动）&gt; 普通柜员 &gt; 授权岗 &nbsp;|&nbsp;
-        <strong>周日：</strong>大堂=现金柜员=授权岗 &gt; 普通柜员
+        <strong>平日优先级：</strong>大堂 &gt; 普通柜员=现金柜员（雷打不动）&gt; 授权岗 &nbsp;|&nbsp;
+        <strong>周日：</strong>大堂 &gt; 普通柜员 &gt; 现金柜员=授权岗
       </p>
       <div className="btn-row">
         <button className="btn btn-primary" onClick={onGenerate}>🔄 随机生成排班</button>

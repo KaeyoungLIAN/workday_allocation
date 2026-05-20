@@ -2,26 +2,27 @@ const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "
 
 /** 固定 4 个岗位（不可变） */
 export const FIXED_POSITIONS = [
-  { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 3 },
+  { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
   { id: "pos_xj", name: "现金柜员", minStaff: 1, maxStaff: 1 },
   { id: "pos_pt", name: "普通柜员", minStaff: 1, maxStaff: 2 },
   { id: "pos_sq", name: "授权岗", minStaff: 1, maxStaff: 1 },
 ];
 
-/** 雷打不动岗位（平日必须满 minStaff） */
-const ESSENTIAL_IDS = new Set(["pos_dt", "pos_xj"]);
-
 /**
  * 岗位的全局优先级（数字越小越优先）。
- * 注意：这里是"全局"优先级，决定先处理哪个岗位。
- * 同岗位内的人员选择由 per-worker priority 决定。
+ * 决定先处理哪个岗位。同岗位内的人员选择由 per-worker priority 决定。
  */
 function getGlobalPriority(posId, day) {
-  const isWeekend = day === 6; // 周日
-  const weekday = { pos_dt: 1, pos_xj: 1, pos_pt: 2, pos_sq: 3 };
-  const weekend = { pos_dt: 1, pos_xj: 1, pos_sq: 1, pos_pt: 2 };
+  const isWeekend = day === 6;
+  // 平日：大堂(1) > 普通柜员=现金柜员(2) > 授权(3)
+  const weekday = { pos_dt: 1, pos_pt: 2, pos_xj: 2, pos_sq: 3 };
+  // 周末：大堂(1) > 普通柜员(2) > 现金柜员=授权(3)
+  const weekend = { pos_dt: 1, pos_pt: 2, pos_xj: 3, pos_sq: 3 };
   return isWeekend ? (weekend[posId] ?? 9) : (weekday[posId] ?? 9);
 }
+
+/** 平日雷打不动岗位（必须满 minStaff） */
+const ESSENTIAL_WEEKDAY = new Set(["pos_dt", "pos_pt", "pos_xj"]);
 
 /**
  * Generate a schedule for one week.
@@ -77,15 +78,16 @@ export function generateSchedule(config) {
 
 /**
  * 检查排班是否满足最低要求。
- * 雷打不动岗位（大堂、现金柜员）未满 minStaff 时报警。
+ * 平日雷打不动岗位（大堂、普通柜员、现金柜员）未满 minStaff 时报警。
  */
 export function validateSchedule(config, schedule) {
   const warnings = [];
   for (let day = 0; day < 7; day++) {
-    if (day === 5) continue; // 周六不检查
+    if (day === 5) continue;
+    const isWeekend = day === 6;
     for (const pos of FIXED_POSITIONS) {
       const assigned = schedule[day]?.[pos.id]?.length || 0;
-      const isEssential = ESSENTIAL_IDS.has(pos.id);
+      const isEssential = !isWeekend && ESSENTIAL_WEEKDAY.has(pos.id);
       const minOk = assigned >= pos.minStaff;
 
       if (!minOk && isEssential) {
