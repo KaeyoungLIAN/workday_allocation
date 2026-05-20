@@ -122,7 +122,7 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
                   return (
                     <div key={pos.id} className="pos-block">
                       <div className="pos-label" style={{ color: POS_COLORS[FIXED_POSITIONS.indexOf(pos)] }}>
-                        {pos.name} ({assigned.length}/{pos.minStaff})
+                        {pos.name} ({assigned.length}/{pos.minStaff}{pos.maxStaff !== pos.minStaff ? `~${pos.maxStaff}` : ''})
                       </div>
                       {assigned.length > 0 ? assigned.map((name, i) => (
                         <div key={i} className={"pos-worker" + (short ? " short" : "")}>{name}</div>
@@ -305,7 +305,7 @@ function WorkerModal({ initial, onSave, onClose }) {
                   <div key={p.id} className="pos-priority-row"
                     style={selected ? { borderColor: POS_COLORS[i], background: POS_COLORS[i] + "15" } : {}}
                     onClick={() => togglePos(p.id)}>
-                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i] } : {}}>{p.name} ({p.minStaff}人)</span>
+                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i] } : {}}>{p.name} ({p.minStaff}{p.maxStaff !== p.minStaff ? `~${p.maxStaff}` : ''}人)</span>
                     {selected && (
                       <div className="prio-control" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="prio-btn" onClick={() => setPriority(p.id, -1)}>-</button>
