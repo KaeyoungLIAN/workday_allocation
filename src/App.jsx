@@ -11,7 +11,7 @@ import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
 import "./App.css";
 
 /* ── Color palette for positions ── */
-const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055"];
+const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8"];
 
 let nextWorkerId = Date.now();
 
@@ -96,7 +96,11 @@ export default function App() {
   };
 
   const workerCount = config.workers.length;
-  const totalPosNeed = config.positions.reduce((s, p) => s + p.minStaff * 7, 0);
+  const totalPosNeed = config.positions.reduce((s, p) => {
+    // 周日专属岗位只计1天×1人
+    if (p.sundayOnly) return s + 1;
+    return s + p.minStaff * 6; // 6天（周六休息）
+  }, 0);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -106,6 +110,7 @@ export default function App() {
           <h1>📋 排班分配器</h1>
           <span>
             {workerCount} 人 · {config.positions.length} 岗位 · 周需 {totalPosNeed} 人次
+            <span className="badge-info" style={{ marginLeft: 8 }}>周六固定休息</span>
           </span>
         </div>
         <div className="tabs">
@@ -173,11 +178,6 @@ export default function App() {
    Schedule View
    ════════════════════════════════════════ */
 function ScheduleView({ config, schedule, warnings, onGenerate }) {
-  const posMap = {};
-  config.positions.forEach((p) => {
-    posMap[p.id] = p;
-  });
-
   return (
     <div>
       <div className="btn-row">
@@ -197,28 +197,40 @@ function ScheduleView({ config, schedule, warnings, onGenerate }) {
       {schedule ? (
         <div className="schedule-grid">
           {DAY_NAMES.map((dayName, day) => (
-            <div key={day} className="day-col">
-              <h3>{dayName}</h3>
-              {config.positions.map((pos) => {
-                const assigned = schedule[day]?.[pos.id] || [];
-                const short = assigned.length < pos.minStaff;
-                return (
-                  <div key={pos.id} className="pos-block">
-                    <div className="pos-label" style={{ color: POS_COLORS[config.positions.indexOf(pos)] }}>
-                      {pos.name} ({assigned.length}/{pos.minStaff})
+            <div key={day} className={"day-col" + (day === 5 ? " day-off" : "")}>
+              <h3>{dayName}
+                {day === 5 && <span className="rest-badge">固定休息</span>}
+                {day === 6 && <span className="rest-badge sun" style={{ marginLeft: 4 }}>周日</span>}
+              </h3>
+              {day === 5 ? (
+                <div className="rest-msg">😴 全体休息</div>
+              ) : (
+                config.positions.map((pos) => {
+                  const assigned = schedule[day]?.[pos.id] || [];
+                  const need = pos.sundayOnly ? 1 : pos.minStaff;
+                  const short = assigned.length < need;
+                  // Skip showing sundayOnly positions on non-Sunday days
+                  if (pos.sundayOnly && day !== 6) return null;
+                  return (
+                    <div key={pos.id} className="pos-block">
+                      <div className="pos-label" style={{ color: POS_COLORS[config.positions.indexOf(pos)] }}>
+                        {pos.name}
+                        {pos.sundayOnly && <span className="sun-badge">周日专</span>}
+                        {" "}({assigned.length}/{need})
+                      </div>
+                      {assigned.length > 0 ? (
+                        assigned.map((name, i) => (
+                          <div key={i} className={"pos-worker" + (short ? " short" : "")}>
+                            {name}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="pos-worker short">— 无人 —</div>
+                      )}
                     </div>
-                    {assigned.length > 0 ? (
-                      assigned.map((name, i) => (
-                        <div key={i} className={"pos-worker" + (short ? " short" : "")}>
-                          {name}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="pos-worker short">— 无人 —</div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           ))}
         </div>
@@ -249,15 +261,18 @@ function WorkersPanel({ config, onAdd, onEdit, onDelete }) {
       ) : (
         <div className="worker-list">
           {config.workers.map((w) => {
-            const posNames = w.positionIds.map(
-              (pid) => config.positions.find((p) => p.id === pid)?.name || pid
-            );
+            const posInfos = (w.positions || []).map((pw) => {
+              const pos = config.positions.find((p) => p.id === pw.id);
+              return { name: pos?.name || pw.id, priority: pw.priority ?? 3 };
+            });
             return (
               <div key={w.id} className="worker-card">
                 <div className="name">{w.name}</div>
                 <div className="tags">
-                  {posNames.map((n) => (
-                    <span key={n} className="tag green">{n}</span>
+                  {posInfos.map((pi) => (
+                    <span key={pi.name} className="tag green" title={`优先级: ${pi.priority}（越小越高）`}>
+                      {pi.name} ⭐{pi.priority}
+                    </span>
                   ))}
                   {w.offDays.length > 0 && (
                     <span className="tag off">
@@ -285,7 +300,7 @@ function PositionsPanel({ config, onUpdate }) {
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
-        修改岗位名称和每日最低人数需求。名称修改后，人员中的岗位关联会自动更新。
+        修改岗位配置。重要性越高，排班时优先满足。周日专属岗位仅周日需要1人，且该人当天不能兼任其他岗。
       </p>
       <div className="pos-config-list">
         {config.positions.map((pos, i) => (
@@ -307,7 +322,25 @@ function PositionsPanel({ config, onUpdate }) {
                 onUpdate(pos.id, { minStaff: Math.max(0, parseInt(e.target.value) || 0) })
               }
             />
-            <span className="label-text">人</span>
+            <span className="label-text">人 · 重要性</span>
+            <input
+              className="staff-input"
+              type="number"
+              min={1}
+              max={10}
+              value={pos.importance ?? 1}
+              onChange={(e) =>
+                onUpdate(pos.id, { importance: Math.max(1, parseInt(e.target.value) || 1) })
+              }
+            />
+            <label className="sun-toggle" title="周日专属：仅周日照排1人，该人当天不可做其他岗">
+              <input
+                type="checkbox"
+                checked={pos.sundayOnly || false}
+                onChange={(e) => onUpdate(pos.id, { sundayOnly: e.target.checked })}
+              />
+              <span>周日专</span>
+            </label>
           </div>
         ))}
       </div>
@@ -386,18 +419,33 @@ function ExportImport({ config, onImport, onImportFromText, setStatus }) {
 }
 
 /* ════════════════════════════════════════
-   Worker Modal (Add / Edit)
+   Worker Modal (Add / Edit) — with priority
    ════════════════════════════════════════ */
 function WorkerModal({ config, initial, onSave, onClose }) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || "");
-  const [posIds, setPosIds] = useState(initial?.positionIds || []);
+  // positions: [{ id, priority }]
+  const [positions, setPositions] = useState(initial?.positions || []);
   const [offDays, setOffDays] = useState(initial?.offDays || []);
 
-  const togglePos = (id) => {
-    setPosIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const setPriority = (posId, priority) => {
+    setPositions((prev) => {
+      const existing = prev.find((p) => p.id === posId);
+      if (existing) {
+        return prev.map((p) =>
+          p.id === posId ? { ...p, priority: Math.max(1, Math.min(10, priority || 3)) } : p
+        );
+      }
+      return [...prev, { id: posId, priority: Math.max(1, Math.min(10, priority || 3)) }];
+    });
+  };
+
+  const togglePos = (posId) => {
+    setPositions((prev) => {
+      const existing = prev.find((p) => p.id === posId);
+      if (existing) return prev.filter((p) => p.id !== posId);
+      return [...prev, { id: posId, priority: 3 }];
+    });
   };
 
   const toggleOff = (d) => {
@@ -409,8 +457,8 @@ function WorkerModal({ config, initial, onSave, onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    if (posIds.length === 0) return;
-    onSave({ name: name.trim(), positionIds: posIds, offDays });
+    if (positions.length === 0) return;
+    onSave({ name: name.trim(), positions, offDays });
   };
 
   return (
@@ -429,33 +477,50 @@ function WorkerModal({ config, initial, onSave, onClose }) {
             />
           </div>
           <div className="form-group">
-            <label>可担任岗位（至少选一个）</label>
-            <div className="checkbox-group">
-              {config.positions.map((p, i) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={"checkbox-btn" + (posIds.includes(p.id) ? " selected" : "")}
-                  style={posIds.includes(p.id) ? { borderColor: POS_COLORS[i], background: POS_COLORS[i] + "22", color: POS_COLORS[i] } : {}}
-                  onClick={() => togglePos(p.id)}
-                >
-                  {p.name}
-                </button>
-              ))}
+            <label>岗位与优先级（数字越小优先级越高，至少选一个）</label>
+            <div className="pos-priority-grid">
+              {config.positions.map((p, i) => {
+                const entry = positions.find((ep) => ep.id === p.id);
+                const selected = !!entry;
+                return (
+                  <div key={p.id} className="pos-priority-row"
+                    style={selected ? { borderColor: POS_COLORS[i], background: POS_COLORS[i] + "15" } : {}}
+                    onClick={() => togglePos(p.id)}
+                  >
+                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i] } : {}}>
+                      {p.name}
+                      {p.sundayOnly && <span className="sun-badge-sm">周日专</span>}
+                    </span>
+                    {selected && (
+                      <div className="prio-control" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="prio-btn" onClick={() => setPriority(p.id, (entry.priority ?? 3) - 1)}>-</button>
+                        <span className="prio-value">{entry.priority ?? 3}</span>
+                        <button type="button" className="prio-btn" onClick={() => setPriority(p.id, (entry.priority ?? 3) + 1)}>+</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="form-group">
-            <label>休息日（可多选）</label>
+            <label>休息日（可多选，周六固定休息自动安排）</label>
             <div className="checkbox-group">
               {DAY_NAMES.map((d, i) => (
                 <button
                   key={i}
                   type="button"
-                  className={"checkbox-btn" + (offDays.includes(i) ? " selected" : "")}
-                  style={offDays.includes(i) ? { borderColor: "var(--red)", background: "var(--red-light)", color: "var(--red)" } : {}}
-                  onClick={() => toggleOff(i)}
+                  className={"checkbox-btn" + (offDays.includes(i) ? " selected" : "") + (i === 5 ? " auto-off" : "")}
+                  style={
+                    i === 5
+                      ? { borderColor: "var(--text-muted)", opacity: 0.5, cursor: "default" }
+                      : offDays.includes(i)
+                        ? { borderColor: "var(--red)", background: "var(--red-light)", color: "var(--red)" }
+                        : {}
+                  }
+                  onClick={() => i !== 5 && toggleOff(i)}
                 >
-                  {d}
+                  {d}{i === 5 ? " (自动)" : ""}
                 </button>
               ))}
             </div>
@@ -466,7 +531,7 @@ function WorkerModal({ config, initial, onSave, onClose }) {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={!name.trim() || posIds.length === 0}
+              disabled={!name.trim() || positions.length === 0}
             >
               {isEdit ? "保存" : "添加"}
             </button>
