@@ -14,15 +14,12 @@ export const FIXED_POSITIONS = [
  */
 function getGlobalPriority(posId, day) {
   const isWeekend = day === 6;
-  // 平日：大堂(1) > 普通柜员=现金柜员(2) > 授权(3)
-  const weekday = { pos_dt: 1, pos_pt: 2, pos_xj: 2, pos_sq: 3 };
-  // 周末：大堂(1) > 普通柜员(2) > 现金柜员=授权(3)
-  const weekend = { pos_dt: 1, pos_pt: 2, pos_xj: 3, pos_sq: 3 };
+  // 平日：大堂(1) > 现金柜员(2) > 普通柜员(3) > 授权(4)
+  const weekday = { pos_dt: 1, pos_xj: 2, pos_pt: 3, pos_sq: 4 };
+  // 周末：大堂(1) > 现金柜员(2) > 普通柜员=授权(3)
+  const weekend = { pos_dt: 1, pos_xj: 2, pos_pt: 3, pos_sq: 3 };
   return isWeekend ? (weekend[posId] ?? 9) : (weekday[posId] ?? 9);
 }
-
-/** 平日雷打不动岗位（必须满 minStaff） */
-const ESSENTIAL_WEEKDAY = new Set(["pos_dt", "pos_pt", "pos_xj"]);
 
 /**
  * Generate a schedule for one week.
@@ -84,10 +81,10 @@ export function validateSchedule(config, schedule) {
   const warnings = [];
   for (let day = 0; day < 7; day++) {
     if (day === 5) continue;
-    const isWeekend = day === 6;
     for (const pos of FIXED_POSITIONS) {
       const assigned = schedule[day]?.[pos.id]?.length || 0;
-      const isEssential = !isWeekend && ESSENTIAL_WEEKDAY.has(pos.id);
+      // 大堂除周六外每天雷打不动必须2人
+      const isEssential = pos.id === "pos_dt" && day !== 5;
       const minOk = assigned >= pos.minStaff;
 
       if (!minOk && isEssential) {
