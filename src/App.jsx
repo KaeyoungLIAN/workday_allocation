@@ -97,7 +97,7 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
-        <strong>平日优先级：</strong>大堂 &gt; 现金柜员 &gt; 普通柜员 &gt; 授权岗 &nbsp;|&nbsp;
+        <strong>平日优先级：</strong>大堂 &gt; 现金柜员 &gt; 普通柜员 &nbsp;|&nbsp;
         <strong>周日：</strong>大堂 &gt; 现金柜员 &gt; 普通柜员=授权岗
       </p>
       <div className="btn-row">
@@ -117,6 +117,8 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
                 <div className="rest-msg">😴 全体休息</div>
               ) : (
                 FIXED_POSITIONS.map((pos) => {
+                  // 授权岗周一到周五不显示
+                  if (pos.id === "pos_sq" && day >= 0 && day <= 4) return null;
                   const assigned = schedule[day]?.[pos.id] || [];
                   const short = assigned.length < pos.minStaff;
                   return (

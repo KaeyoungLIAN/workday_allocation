@@ -46,6 +46,8 @@ export function generateSchedule(config) {
     );
 
     for (const pos of sorted) {
+      // 授权岗周一到周五不需要
+      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue;
       const available = workers.filter(
         (w) =>
           !w.offDays.includes(day) &&
@@ -82,6 +84,8 @@ export function validateSchedule(config, schedule) {
   for (let day = 0; day < 7; day++) {
     if (day === 5) continue;
     for (const pos of FIXED_POSITIONS) {
+      // 授权岗周一到周五不需要
+      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue;
       const assigned = schedule[day]?.[pos.id]?.length || 0;
       // 大堂除周六外每天雷打不动必须2人
       const isEssential = pos.id === "pos_dt" && day !== 5;
