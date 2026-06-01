@@ -6,33 +6,39 @@ import {
   copyWorkers,
   importWorkers,
   importWorkersFromText,
+  loadPositions,
+  savePositions,
+  resetPositions,
+  generatePosId,
 } from "./config";
-import { generateSchedule, validateSchedule, FIXED_POSITIONS, DAY_NAMES } from "./scheduler";
+import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
 import "./App.css";
 
-const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055"];
+const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8", "#a29bfe", "#fab1a0", "#55efc4"];
 
 let nextWorkerId = Date.now();
 
 export default function App() {
   const [tab, setTab] = useState("schedule");
   const [workers, setWorkers] = useState(() => loadWorkers());
+  const [positions, setPositions] = useState(() => loadPositions());
   const [schedule, setSchedule] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [workerModal, setWorkerModal] = useState(null);
   const [status, setStatus] = useState("");
+  const [showWarnings, setShowWarnings] = useState(false); // 点击排班后才显示
 
   useEffect(() => { saveWorkers(workers); }, [workers]);
+  useEffect(() => { savePositions(positions); }, [positions]);
 
   const doGenerate = useCallback(() => {
-    const s = generateSchedule({ workers });
+    const s = generateSchedule({ workers, positions });
     setSchedule(s);
-    const ws = validateSchedule({ workers }, s);
+    const ws = validateSchedule({ workers, positions }, s);
     setWarnings(ws);
+    setShowWarnings(true);
     setStatus(ws.length === 0 ? "✅ 排班生成完成" : `⚠️ 完成，但有${ws.length}条警告`);
-  }, [workers]);
-
-  useEffect(() => { doGenerate(); }, []);
+  }, [workers, positions]);
 
   const addWorker = (data) => {
     if (workers.find((w) => w.name === data.name)) {
@@ -55,30 +61,57 @@ export default function App() {
     setStatus(`已删除: ${w?.name || "未知"}`);
   };
 
-  const totalNeed = FIXED_POSITIONS.reduce((s, p) => s + p.minStaff * 6, 0);
+  const updatePositions = (newPos) => {
+    setPositions(newPos);
+    setSchedule(null);
+    setShowWarnings(false);
+  };
+
+  const totalNeed = positions.reduce((s, p) => s + p.minStaff * 6, 0);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header className="app-header">
         <div>
           <h1>📋 排班分配器</h1>
-          <span>{workers.length} 人 · 4 岗位 · 周需 {totalNeed} 人次 · 周六固定休息</span>
+          <span>{workers.length} 人 · {positions.length} 岗位 · 周需 {totalNeed} 人次 · 周六固定休息</span>
         </div>
         <div className="tabs">
           <button className={"tab-btn" + (tab === "schedule" ? " active" : "")} onClick={() => setTab("schedule")}>🗓 排班表</button>
           <button className={"tab-btn" + (tab === "workers" ? " active" : "")} onClick={() => setTab("workers")}>👥 人员</button>
+          <button className={"tab-btn" + (tab === "positions" ? " active" : "")} onClick={() => setTab("positions")}>🏢 岗位</button>
           <button className={"tab-btn" + (tab === "export" ? " active" : "")} onClick={() => setTab("export")}>📦 导出</button>
         </div>
       </header>
 
       <div className="content" style={{ flex: 1 }}>
-        {tab === "schedule" && <ScheduleView schedule={schedule} warnings={warnings} onGenerate={doGenerate} />}
-        {tab === "workers" && <WorkersView workers={workers} onAdd={() => setWorkerModal("add")} onEdit={(w) => setWorkerModal(w)} onDelete={deleteWorker} />}
+        {tab === "schedule" && (
+          <ScheduleView
+            schedule={schedule}
+            warnings={warnings}
+            showWarnings={showWarnings}
+            onGenerate={doGenerate}
+            positions={positions}
+          />
+        )}
+        {tab === "workers" && (
+          <WorkersView
+            workers={workers}
+            positions={positions}
+            onAdd={() => setWorkerModal("add")}
+            onEdit={(w) => setWorkerModal(w)}
+            onDelete={deleteWorker}
+          />
+        )}
+        {tab === "positions" && (
+          <PositionsView positions={positions} onChange={updatePositions} setStatus={setStatus} />
+        )}
         {tab === "export" && <ExportView workers={workers} setStatus={setStatus} onImport={(data) => { setWorkers(data); setStatus("✅ 人员已导入"); }} />}
 
         {workerModal && (
           <WorkerModal
             initial={workerModal === "add" ? null : workerModal}
+            positions={positions}
             onSave={(data) => { workerModal === "add" ? addWorker(data) : updateWorker(workerModal.id, data); }}
             onClose={() => setWorkerModal(null)}
           />
@@ -91,9 +124,9 @@ export default function App() {
 }
 
 /* ════════════════════════════════════════
-   Schedule View — uses FIXED_POSITIONS
+   Schedule View
    ════════════════════════════════════════ */
-function ScheduleView({ schedule, warnings, onGenerate }) {
+function ScheduleView({ schedule, warnings, showWarnings, onGenerate, positions }) {
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
@@ -103,8 +136,9 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
       <div className="btn-row">
         <button className="btn btn-primary" onClick={onGenerate}>🔄 随机生成排班</button>
       </div>
-      {warnings.length > 0 && (
-        <div style={{ marginTop: 12 }}>
+      {showWarnings && warnings.length > 0 && (
+        <div className="warning-panel" style={{ marginTop: 12 }}>
+          <div className="warning-title">⚠️ 排班警告 ({warnings.length})</div>
           {warnings.map((w, i) => <div key={i} className="warning-badge" style={{ marginTop: 4 }}>⚠️ {w}</div>)}
         </div>
       )}
@@ -116,14 +150,13 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
               {day === 5 ? (
                 <div className="rest-msg">😴 全体休息</div>
               ) : (
-                FIXED_POSITIONS.map((pos) => {
-                  // 授权岗周一到周五不显示
-                  if (pos.id === "pos_sq" && day >= 0 && day <= 4) return null;
+                positions.map((pos, pi) => {
+                  if (!needPosOnDay(pos.id, day, positions)) return null;
                   const assigned = schedule[day]?.[pos.id] || [];
                   const short = assigned.length < pos.minStaff;
                   return (
                     <div key={pos.id} className="pos-block">
-                      <div className="pos-label" style={{ color: POS_COLORS[FIXED_POSITIONS.indexOf(pos)] }}>
+                      <div className="pos-label" style={{ color: POS_COLORS[pi % POS_COLORS.length] }}>
                         {pos.name} ({assigned.length}/{pos.minStaff}{pos.maxStaff !== pos.minStaff ? `~${pos.maxStaff}` : ''})
                       </div>
                       {assigned.length > 0 ? assigned.map((name, i) => (
@@ -145,10 +178,16 @@ function ScheduleView({ schedule, warnings, onGenerate }) {
   );
 }
 
+function needPosOnDay(posId, day, positions) {
+  if (day === 5) return false;
+  if (posId === "pos_sq" && day >= 0 && day <= 4) return false;
+  return true;
+}
+
 /* ════════════════════════════════════════
    Workers View
    ════════════════════════════════════════ */
-function WorkersView({ workers, onAdd, onEdit, onDelete }) {
+function WorkersView({ workers, positions, onAdd, onEdit, onDelete }) {
   return (
     <div>
       <div className="btn-row">
@@ -159,7 +198,7 @@ function WorkersView({ workers, onAdd, onEdit, onDelete }) {
       ) : (
         <div className="worker-list">
           {workers.map((w) => (
-            <WorkerCard key={w.id} worker={w} onEdit={onEdit} onDelete={onDelete} />
+            <WorkerCard key={w.id} worker={w} positions={positions} onEdit={onEdit} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -167,9 +206,9 @@ function WorkersView({ workers, onAdd, onEdit, onDelete }) {
   );
 }
 
-function WorkerCard({ worker: w, onEdit, onDelete }) {
+function WorkerCard({ worker: w, positions, onEdit, onDelete }) {
   const posInfos = (w.positions || []).map((pw) => {
-    const pos = FIXED_POSITIONS.find((p) => p.id === pw.id);
+    const pos = positions.find((p) => p.id === pw.id);
     return { name: pos?.name || pw.id, priority: pw.priority ?? 3 };
   });
   return (
@@ -194,7 +233,102 @@ function WorkerCard({ worker: w, onEdit, onDelete }) {
 }
 
 /* ════════════════════════════════════════
-   Export View — only workers
+   Positions View — 自定义岗位管理
+   ════════════════════════════════════════ */
+function PositionsView({ positions, onChange, setStatus }) {
+  const [editName, setEditName] = useState(() => positions.map((p) => p.name));
+
+  // 同步 editName 当 positions 从外部改变时
+  useEffect(() => {
+    setEditName(positions.map((p) => p.name));
+  }, [positions]);
+
+  const updatePos = (index, field, value) => {
+    const next = positions.map((p, i) => {
+      if (i !== index) return p;
+      let v = value;
+      if (field === "minStaff" || field === "maxStaff") {
+        v = Math.max(1, parseInt(value) || 1);
+      }
+      return { ...p, [field]: v };
+    });
+    onChange(next);
+  };
+
+  const addPos = () => {
+    const id = generatePosId();
+    const next = [...positions, { id, name: "新岗位", minStaff: 1, maxStaff: 1 }];
+    onChange(next);
+    setEditName(next.map((p) => p.name));
+    setStatus("✅ 已添加新岗位");
+  };
+
+  const deletePos = (index) => {
+    if (positions.length <= 1) {
+      setStatus("⚠️ 至少保留一个岗位");
+      return;
+    }
+    const next = positions.filter((_, i) => i !== index);
+    onChange(next);
+    setStatus("✅ 已删除岗位");
+  };
+
+  const applyName = (index) => {
+    const next = positions.map((p, i) =>
+      i === index ? { ...p, name: editName[i] || p.name } : p
+    );
+    onChange(next);
+  };
+
+  const handleReset = () => {
+    const next = resetPositions();
+    onChange(next);
+    setStatus("✅ 已重置为默认岗位");
+  };
+
+  return (
+    <div>
+      <div className="btn-row">
+        <button className="btn btn-primary" onClick={addPos}>+ 添加岗位</button>
+        <button className="btn btn-danger" onClick={handleReset}>↺ 恢复默认</button>
+      </div>
+      <div className="pos-config-list">
+        {positions.map((pos, i) => (
+          <div key={pos.id} className="pos-config-card">
+            <div className="color-dot" style={{ background: POS_COLORS[i % POS_COLORS.length] }} />
+            <input
+              className="name-input"
+              value={editName[i] ?? ""}
+              onChange={(e) => setEditName(editName.map((n, j) => (j === i ? e.target.value : n)))}
+              onBlur={() => applyName(i)}
+              placeholder="岗位名称"
+            />
+            <span className="label-text">最少</span>
+            <input
+              className="staff-input"
+              type="number"
+              min={1}
+              value={pos.minStaff}
+              onChange={(e) => updatePos(i, "minStaff", e.target.value)}
+            />
+            <span className="label-text">最多</span>
+            <input
+              className="staff-input"
+              type="number"
+              min={1}
+              value={pos.maxStaff}
+              onChange={(e) => updatePos(i, "maxStaff", e.target.value)}
+            />
+            <button className="btn btn-sm btn-danger" onClick={() => deletePos(i)} style={{ marginLeft: "auto" }}>删除</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   Export View — workers only
    ════════════════════════════════════════ */
 function ExportView({ workers, setStatus }) {
   const [copied, setCopied] = useState(false);
@@ -230,7 +364,7 @@ function ExportView({ workers, setStatus }) {
 
   return (
     <div className="export-section">
-      <p>岗位已固定（大堂/现金柜员/普通柜员/授权岗），会变化的数据只有人员。</p>
+      <p>岗位和人员都是可自定义的，导出数据包含人员信息。</p>
       <div className="btn-row">
         <button className="btn btn-primary" onClick={handleCopy}>{copied ? "✅ 已复制" : "📋 复制人员"}</button>
         <button className="btn" onClick={handleDownload}>{downloaded ? "✅ 已下载" : "📥 下载人员"}</button>
@@ -258,34 +392,34 @@ function ExportView({ workers, setStatus }) {
 /* ════════════════════════════════════════
    Worker Modal — with priority per position
    ════════════════════════════════════════ */
-function WorkerModal({ initial, onSave, onClose }) {
+function WorkerModal({ initial, positions, onSave, onClose }) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || "");
-  const [positions, setPositions] = useState(initial?.positions || []);
+  const [workerPos, setWorkerPos] = useState(initial?.positions || []);
   const [offDays, setOffDays] = useState(initial?.offDays || []);
 
   const togglePos = (posId) => {
-    setPositions((prev) => {
+    setWorkerPos((prev) => {
       const existing = prev.find((p) => p.id === posId);
       return existing ? prev.filter((p) => p.id !== posId) : [...prev, { id: posId, priority: 3 }];
     });
   };
 
   const setPriority = (posId, delta) => {
-    setPositions((prev) => prev.map((p) =>
+    setWorkerPos((prev) => prev.map((p) =>
       p.id === posId ? { ...p, priority: Math.max(1, Math.min(10, (p.priority || 3) + delta)) } : p
     ));
   };
 
   const toggleOff = (d) => {
-    if (d === 5) return; // 周六固定休息，不可手动改
+    if (d === 5) return;
     setOffDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim() || positions.length === 0) return;
-    onSave({ name: name.trim(), positions, offDays });
+    if (!name.trim() || workerPos.length === 0) return;
+    onSave({ name: name.trim(), positions: workerPos, offDays });
   };
 
   return (
@@ -300,14 +434,14 @@ function WorkerModal({ initial, onSave, onClose }) {
           <div className="form-group">
             <label>岗位与优先级（数字越小优先级越高，至少选一个）</label>
             <div className="pos-priority-grid">
-              {FIXED_POSITIONS.map((p, i) => {
-                const entry = positions.find((ep) => ep.id === p.id);
+              {positions.map((p, i) => {
+                const entry = workerPos.find((ep) => ep.id === p.id);
                 const selected = !!entry;
                 return (
                   <div key={p.id} className="pos-priority-row"
-                    style={selected ? { borderColor: POS_COLORS[i], background: POS_COLORS[i] + "15" } : {}}
+                    style={selected ? { borderColor: POS_COLORS[i % POS_COLORS.length], background: POS_COLORS[i % POS_COLORS.length] + "15" } : {}}
                     onClick={() => togglePos(p.id)}>
-                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i] } : {}}>{p.name} ({p.minStaff}{p.maxStaff !== p.minStaff ? `~${p.maxStaff}` : ''}人)</span>
+                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i % POS_COLORS.length] } : {}}>{p.name} ({p.minStaff}{p.maxStaff !== p.minStaff ? `~${p.maxStaff}` : ''}人)</span>
                     {selected && (
                       <div className="prio-control" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="prio-btn" onClick={() => setPriority(p.id, -1)}>-</button>
@@ -337,7 +471,7 @@ function WorkerModal({ initial, onSave, onClose }) {
           </div>
           <div className="form-actions">
             <button type="button" className="btn" onClick={onClose}>取消</button>
-            <button type="submit" className="btn btn-primary" disabled={!name.trim() || positions.length === 0}>
+            <button type="submit" className="btn btn-primary" disabled={!name.trim() || workerPos.length === 0}>
               {isEdit ? "保存" : "添加"}
             </button>
           </div>

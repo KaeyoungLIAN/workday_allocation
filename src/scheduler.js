@@ -1,33 +1,50 @@
 const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-/** 固定 4 个岗位（不可变） */
-export const FIXED_POSITIONS = [
-  { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
-  { id: "pos_xj", name: "现金柜员", minStaff: 1, maxStaff: 1 },
-  { id: "pos_pt", name: "普通柜员", minStaff: 1, maxStaff: 2 },
-  { id: "pos_sq", name: "授权岗", minStaff: 1, maxStaff: 1 },
-];
-
 /**
  * 岗位的全局优先级（数字越小越优先）。
- * 决定先处理哪个岗位。同岗位内的人员选择由 per-worker priority 决定。
+ * 默认规则：大堂(1) > 现金柜员(2) > 普通柜员(3) > 授权岗(4)
+ * 周日：大堂(1) > 现金柜员(2) > 普通柜员=授权岗(3)
+ * 自定义岗位的默认优先级为 9（靠后）
  */
-function getGlobalPriority(posId, day) {
+function getGlobalPriority(posId, positions, day) {
+  const idx = positions.findIndex((p) => p.id === posId);
   const isWeekend = day === 6;
-  // 平日：大堂(1) > 现金柜员(2) > 普通柜员(3) > 授权(4)
-  const weekday = { pos_dt: 1, pos_xj: 2, pos_pt: 3, pos_sq: 4 };
-  // 周末：大堂(1) > 现金柜员(2) > 普通柜员=授权(3)
-  const weekend = { pos_dt: 1, pos_xj: 2, pos_pt: 3, pos_sq: 3 };
-  return isWeekend ? (weekend[posId] ?? 9) : (weekday[posId] ?? 9);
+
+  // 前 4 个默认岗位用固定优先级
+  const defaultIds = ["pos_dt", "pos_xj", "pos_pt", "pos_sq"];
+  const defaultIdx = defaultIds.indexOf(posId);
+  if (defaultIdx !== -1) {
+    if (isWeekend) {
+      const weekend = [1, 2, 3, 3]; // 大堂>现金柜员>普通柜员=授权
+      return weekend[defaultIdx];
+    }
+    return defaultIdx + 1; // 1,2,3,4
+  }
+
+  // 自定义岗位按在列表中的顺序
+  return 10 + idx;
+}
+
+/**
+ * 授权岗是否在此日需要（周一~周五不需要，周六全体休息不处理，周日需要）
+ */
+function needPosOnDay(posId, day, positions) {
+  const pos = positions.find((p) => p.id === posId);
+  if (!pos) return false;
+  // 周六全体休息
+  if (day === 5) return false;
+  // 授权岗（pos_sq）周一~周五不需要
+  if (posId === "pos_sq" && day >= 0 && day <= 4) return false;
+  return true;
 }
 
 /**
  * Generate a schedule for one week.
- * @param {object} config - { workers }
+ * @param {object} config - { workers, positions }
  * @returns {object} { [dayIndex]: { [positionId]: [workerName, ...] } }
  */
 export function generateSchedule(config) {
-  const { workers } = config;
+  const { workers, positions } = config;
   const schedule = {};
 
   for (let day = 0; day < 7; day++) {
@@ -41,13 +58,12 @@ export function generateSchedule(config) {
     const assignedToday = new Set();
 
     // 按全局优先级排序
-    const sorted = [...FIXED_POSITIONS].sort(
-      (a, b) => getGlobalPriority(a.id, day) - getGlobalPriority(b.id, day)
+    const sorted = [...positions].sort(
+      (a, b) => getGlobalPriority(a.id, positions, day) - getGlobalPriority(b.id, positions, day)
     );
 
     for (const pos of sorted) {
-      // 授权岗周一到周五不需要
-      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue;
+      if (!needPosOnDay(pos.id, day, positions)) continue;
       const available = workers.filter(
         (w) =>
           !w.offDays.includes(day) &&
@@ -63,7 +79,6 @@ export function generateSchedule(config) {
         return priA - priB;
       });
 
-      // 先尽量排满 maxStaff
       const assigned = available.slice(0, pos.maxStaff);
       assigned.forEach((w) => assignedToday.add(w.id));
       daySchedule[pos.id] = assigned.map((w) => w.name);
@@ -77,17 +92,17 @@ export function generateSchedule(config) {
 
 /**
  * 检查排班是否满足最低要求。
- * 平日雷打不动岗位（大堂、普通柜员、现金柜员）未满 minStaff 时报警。
+ * 大堂雷打不动必须满 minStaff，其他岗位建议即可。
  */
 export function validateSchedule(config, schedule) {
+  const { positions } = config;
   const warnings = [];
   for (let day = 0; day < 7; day++) {
     if (day === 5) continue;
-    for (const pos of FIXED_POSITIONS) {
-      // 授权岗周一到周五不需要
-      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue;
+    for (const pos of positions) {
+      if (!needPosOnDay(pos.id, day, positions)) continue;
       const assigned = schedule[day]?.[pos.id]?.length || 0;
-      // 大堂除周六外每天雷打不动必须2人
+      // 大堂除周六外每天必须满 minStaff
       const isEssential = pos.id === "pos_dt" && day !== 5;
       const minOk = assigned >= pos.minStaff;
 

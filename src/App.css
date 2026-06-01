@@ -94,6 +94,15 @@ body {
   background: var(--amber); color: #1a1a24; 
   font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm);
 }
+.warning-panel {
+  background: rgba(253, 203, 110, 0.08);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.warning-title {
+  font-size: 13px; font-weight: 600; color: var(--amber); margin-bottom: 4px;
+}
 
 /* ── Workers Panel ── */
 .worker-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }

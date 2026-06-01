@@ -1,4 +1,41 @@
 const STORAGE_KEY = "wd_workers";
+const POS_STORAGE_KEY = "wd_positions";
+
+const DEFAULT_POSITIONS = [
+  { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
+  { id: "pos_xj", name: "现金柜员", minStaff: 1, maxStaff: 1 },
+  { id: "pos_pt", name: "普通柜员", minStaff: 1, maxStaff: 2 },
+  { id: "pos_sq", name: "授权岗", minStaff: 1, maxStaff: 1 },
+];
+
+let nextPosId = Date.now();
+
+export function loadPositions() {
+  try {
+    const raw = localStorage.getItem(POS_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    }
+  } catch {}
+  // 首次使用：写入默认值到 storage 并返回
+  savePositions(DEFAULT_POSITIONS);
+  return DEFAULT_POSITIONS;
+}
+
+export function savePositions(positions) {
+  localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(positions));
+}
+
+export function resetPositions() {
+  savePositions(DEFAULT_POSITIONS);
+  return DEFAULT_POSITIONS;
+}
+
+export function generatePosId() {
+  nextPosId += 1;
+  return `pos_custom_${nextPosId}`;
+}
 
 /** Migrate legacy worker format (positionIds) to new format (positions array). */
 function migrateWorker(w) {
