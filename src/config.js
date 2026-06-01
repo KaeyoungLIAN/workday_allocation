@@ -1,6 +1,6 @@
 const WORKERS_KEY = "wd_workers";
 const POS_STORAGE_KEY = "wd_positions";
-const PRIORITY_STORAGE_KEY = "wd_pos_priorities";
+const ORDER_STORAGE_KEY = "wd_pos_order";
 
 const DEFAULT_POSITIONS = [
   { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
@@ -11,61 +11,41 @@ const DEFAULT_POSITIONS = [
 
 let nextPosId = Date.now();
 
-/** 根据岗位列表生成默认的每日优先级表 */
-export function getDefaultPriorities(positions) {
-  const p = {};
-  for (const pos of positions) {
-    // [周一, 周二, 周三, 周四, 周五, 周六, 周日]
-    const arr = new Array(7).fill(9);
-    arr[5] = 0; // 周六全体休息
-    if (pos.id === "pos_dt") {
-      // 大堂优先最高，周日也是
-      for (let i = 0; i < 5; i++) arr[i] = 1;
-      arr[6] = 1;
-    } else if (pos.id === "pos_xj") {
-      for (let i = 0; i < 5; i++) arr[i] = 2;
-      arr[6] = 2;
-    } else if (pos.id === "pos_pt") {
-      for (let i = 0; i < 5; i++) arr[i] = 3;
-      arr[6] = 3;
-    } else if (pos.id === "pos_sq") {
-      // 授权岗周中 0（不需要），周日 3
-      for (let i = 0; i < 5; i++) arr[i] = 0;
-      arr[6] = 3;
+/** 生成默认排序：周中岗位列表、周日岗位列表 */
+export function getDefaultOrders(positions) {
+  const orders = {};
+  for (let day = 0; day < 7; day++) {
+    if (day === 5) continue; // 周六跳过
+    const list = [];
+    for (const pos of positions) {
+      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue; // 授权周中不需要
+      list.push(pos.id);
     }
-    p[pos.id] = arr;
+    orders[String(day)] = list;
   }
-  return p;
+  return orders;
 }
 
-export function loadPriorities(positions) {
+export function loadOrders(positions) {
   try {
-    const raw = localStorage.getItem(PRIORITY_STORAGE_KEY);
+    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // 校验结构：确保每个岗位都有
-      const result = { ...parsed };
-      let needSave = false;
-      for (const pos of positions) {
-        if (!result[pos.id] || !Array.isArray(result[pos.id]) || result[pos.id].length !== 7) {
-          needSave = true;
-          break;
-        }
-      }
-      if (!needSave) {
-        // 确保多余的非当前岗位被清理？没必要，多余的只会在 bug 时残留
-        return result;
-      }
+      // 校验：每个工作日都存在且有内容
+      const valid = [0, 1, 2, 3, 4, 6].every((d) => {
+        const arr = parsed[String(d)];
+        return Array.isArray(arr) && arr.length > 0;
+      });
+      if (valid) return parsed;
     }
   } catch {}
-  // 首次或结构不对重新生成
-  const def = getDefaultPriorities(positions);
-  savePriorities(def);
+  const def = getDefaultOrders(positions);
+  saveOrders(def);
   return def;
 }
 
-export function savePriorities(priorities) {
-  localStorage.setItem(PRIORITY_STORAGE_KEY, JSON.stringify(priorities));
+export function saveOrders(orders) {
+  localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
 }
 
 export function loadPositions() {
@@ -89,10 +69,6 @@ export function generatePosId() {
   return `pos_custom_${nextPosId}`;
 }
 
-/**
- * 根据岗位配置生成预设职员（首次使用）
- * 每个岗位按 maxStaff 生成足量人员，每人只做一个岗
- */
 export function getDefaultWorkers(positions) {
   const workers = [];
   let id = Date.now();
@@ -112,7 +88,6 @@ export function getDefaultWorkers(positions) {
   return workers;
 }
 
-/** Migrate legacy worker format */
 function migrateWorker(w) {
   if (!w) return w;
   if (w.positions && Array.isArray(w.positions)) return w;

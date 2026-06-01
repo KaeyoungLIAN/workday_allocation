@@ -255,31 +255,60 @@ body {
 .sun-toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .sun-toggle input { cursor: pointer; }
 
-/* ── Priority Grid ── */
-.priority-grid {
-  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+/* ── Day Order Cards ── */
+.day-order-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-top: 8px; overflow: hidden;
+  transition: border-color 200ms;
 }
-.prio-grid-header {
-  display: flex; align-items: center; gap: 4px; padding: 4px 0;
-}
-.prio-row {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 0; border-top: 1px solid var(--border);
-}
-.prio-cell {
-  flex: 1; text-align: center; font-size: 12px; display: flex;
-  align-items: center; justify-content: center; gap: 2px;
-}
-.prio-cell.empty { flex: 0 0 80px; }
-.prio-cell.name { flex: 0 0 80px; font-weight: 600; font-size: 12px; justify-content: flex-start; }
-.prio-cell.day { font-weight: 600; color: var(--text-secondary); font-size: 11px; }
-.prio-cell.off { color: var(--text-muted); font-size: 11px; flex: 1; }
-.prio-input {
-  width: 36px; padding: 3px 0; border: 1px solid var(--border);
-  border-radius: 4px; background: var(--bg); color: var(--text);
-  font-size: 12px; text-align: center; font-family: inherit; outline: none;
-}
-.prio-input:focus { border-color: var(--accent); }
+.day-order-card:hover { border-color: var(--accent); }
+.day-order-card.expanded { border-color: var(--accent); }
+.day-order-card.day-off { opacity: 0.5; pointer-events: none; }
 
-/* ── Placeholder worker cell ── */
+.day-order-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; cursor: pointer; user-select: none;
+}
+.expand-icon { font-size: 10px; color: var(--text-muted); width: 12px; text-align: center; }
+.day-name { font-weight: 600; font-size: 14px; color: var(--text); min-width: 40px; }
+.day-count { font-size: 12px; color: var(--text-secondary); min-width: 40px; }
+.day-status { font-size: 12px; color: var(--text-muted); }
+.day-preview { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; overflow: hidden; }
+
+.pos-tag {
+  font-size: 11px; padding: 1px 6px; border-radius: 4px;
+  color: var(--text); white-space: nowrap;
+}
+
+.day-order-body { padding: 0 16px 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.day-order-actions { display: flex; gap: 6px; margin-bottom: 8px; }
+
+.pos-order-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.pos-order-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--bg);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm); cursor: grab;
+  transition: all 150ms;
+}
+.pos-order-item:hover { border-color: var(--accent); background: var(--surface-hover); }
+.pos-order-item.dragging { opacity: 0.5; border-style: dashed; }
+.drag-handle { color: var(--text-muted); font-size: 16px; cursor: grab; user-select: none; }
+.pos-order-name { font-weight: 500; font-size: 13px; flex: 1; }
+.btn-remove { width: 20px; height: 20px; border: none; border-radius: 50%;
+  background: transparent; color: var(--text-muted); font-size: 12px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 150ms;
+}
+.btn-remove:hover { background: var(--red-light); color: var(--red); }
+
+.pos-unselected { margin-top: 4px; }
+.unselected-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.unselected-list { display: flex; gap: 4px; flex-wrap: wrap; }
+.pos-tag-clickable {
+  font-size: 11px; padding: 2px 8px; border: 1px dashed var(--border);
+  border-radius: 4px; cursor: pointer; transition: all 150ms;
+}
+.pos-tag-clickable:hover { border-style: solid; background: var(--accent-light); }
+.unselected-empty { font-size: 11px; color: var(--text-muted); }
 .pos-worker.placeholder { color: var(--text-muted); background: transparent; border: 1px dashed var(--border); }
