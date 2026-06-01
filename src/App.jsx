@@ -27,7 +27,7 @@ const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8", "#a29
 let nextWorkerId = Date.now();
 
 export default function App() {
-  const [positions] = useState(() => loadPositions());
+  const [positions, setPositions] = useState(() => loadPositions());
   const [workdays, setWorkdays] = useState(() => loadWorkdays());
   const [orders, setOrders] = useState(() => loadOrders(loadPositions(), loadWorkdays()));
   const [workers, setWorkers] = useState(() => {
@@ -316,7 +316,7 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
       let v = value;
       if (field === "minStaff" || field === "maxStaff") {
         const parsed = parseInt(value, 10);
-        if (isNaN(parsed)) return;
+        if (isNaN(parsed)) return p;
         v = Math.max(1, Math.min(20, parsed));
       }
       return { ...p, [field]: v };
@@ -434,16 +434,16 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
             <span className="label-text">最少</span>
             <input
               className="staff-input"
-              type="number"
-              min={1}
+              type="text"
+              inputMode="numeric"
               value={pos.minStaff}
               onChange={(e) => updatePos(i, "minStaff", e.target.value)}
             />
             <span className="label-text">最多</span>
             <input
               className="staff-input"
-              type="number"
-              min={1}
+              type="text"
+              inputMode="numeric"
               value={pos.maxStaff}
               onChange={(e) => updatePos(i, "maxStaff", e.target.value)}
             />
