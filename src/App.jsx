@@ -18,7 +18,7 @@ import {
   ALL_DAYS,
 } from "./config";
 import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
-import { exportScheduleXlsx, exportAllData } from "./export";
+import { exportScheduleXlsx, exportAllData, copyAllData } from "./export";
 import "./App.css";
 
 const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8", "#a29bfe", "#fab1a0", "#55efc4"];
@@ -40,6 +40,16 @@ export default function App() {
   const [warnings, setWarnings] = useState([]);
   const [workerModal, setWorkerModal] = useState(null);
   const [status, setStatus] = useState("");
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  // 首次打开自动显示使用说明
+  useEffect(() => {
+    const shown = localStorage.getItem("wd_guide_shown");
+    if (!shown) {
+      setGuideOpen(true);
+      localStorage.setItem("wd_guide_shown", "1");
+    }
+  }, []);
 
   useEffect(() => { saveWorkers(workers); }, [workers]);
   useEffect(() => { savePositions(positions); }, [positions]);
@@ -104,6 +114,7 @@ export default function App() {
           <button className={"tab-btn" + (tab === "workers" ? " active" : "")} onClick={() => setTab("workers")}>👥 人员</button>
           <button className={"tab-btn" + (tab === "positions" ? " active" : "")} onClick={() => setTab("positions")}>🏢 岗位</button>
           <button className={"tab-btn" + (tab === "export" ? " active" : "")} onClick={() => setTab("export")}>📦 导出</button>
+          <button className="tab-btn help-btn" onClick={() => setGuideOpen(true)} title="使用说明">?</button>
         </div>
       </header>
 
@@ -148,6 +159,9 @@ export default function App() {
             onClose={() => setWorkerModal(null)}
           />
         )}
+
+        {/* 使用说明 */}
+        {guideOpen && <GuideModal onClose={() => setGuideOpen(false)} />}
       </div>
 
       <div className="status-bar">{status}</div>
@@ -567,64 +581,81 @@ function DayOrderCard({
 }
 
 /* ════════════════════════════════════════
-   Export View
+   Export View — 导入/导出全部
    ════════════════════════════════════════ */
 function ExportView({ workers, positions, orders, workdays, setStatus }) {
-  const [copied, setCopied] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
-  const [pasteText, setPasteText] = useState("");
+  const [importSource, setImportSource] = useState(""); // 粘贴文本或文件读取后的内容
+  const [importFileName, setImportFileName] = useState("");
 
-  const handleCopy = () => { copyWorkers(workers); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const handleDownload = () => { exportWorkers(workers); setDownloaded(true); setTimeout(() => setDownloaded(false), 2000); };
-  const handleAllExport = () => { exportAllData(positions, workers, orders, workdays); setStatus("✅ 全量数据已导出"); };
-
-  const handlePasteImport = () => {
+  // 通用的导入逻辑
+  const doImport = (jsonText) => {
     try {
-      const data = importWorkersFromText(pasteText);
-      localStorage.setItem("wd_workers", JSON.stringify(data));
-      setStatus("✅ 人员已导入，请刷新页面");
-      setPasteText("");
+      const data = JSON.parse(jsonText);
+      if (!data.version || !data.workers || !data.positions || !data.orders) {
+        throw new Error("数据格式不正确，请使用导出全部生成的文件");
+      }
+      localStorage.setItem("wd_positions", JSON.stringify(data.positions));
+      localStorage.setItem("wd_pos_order", JSON.stringify(data.orders));
+      localStorage.setItem("wd_workers", JSON.stringify(data.workers));
+      if (data.workdays) localStorage.setItem("wd_workdays", JSON.stringify(data.workdays));
+      setStatus("✅ 数据已导入，请刷新页面");
+      setImportSource("");
+      setImportFileName("");
     } catch (err) {
       setStatus(`❌ 导入失败: ${err.message}`);
     }
   };
 
-  const handleFileImport = async (e) => {
+  const handleAllExport = () => {
+    exportAllData(positions, workers, orders, workdays);
+    setStatus("✅ 数据已导出");
+  };
+
+  const handleCopy = () => {
+    copyAllData(positions, workers, orders, workdays);
+    setStatus("✅ 已复制到剪贴板");
+  };
+
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const data = await importWorkers(file);
-      localStorage.setItem("wd_workers", JSON.stringify(data));
-      setStatus("✅ 人员已导入，请刷新页面");
+      const text = await file.text();
+      setImportSource(text);
+      setImportFileName(file.name);
     } catch (err) {
-      setStatus(`❌ ${err.message}`);
+      setStatus(`❌ 读取文件失败: ${err.message}`);
     }
     e.target.value = "";
   };
 
   return (
     <div className="export-section">
-      <p>岗位和人员都是可自定义的。</p>
+      <h3 style={{ fontSize: 15, marginBottom: 12, fontWeight: 600 }}>导出</h3>
+      <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 16 }}>
+        导出全部配置（岗位、人员、排序、工作日），导入时恢复完整设置。
+      </p>
       <div className="btn-row">
-        <button className="btn btn-primary" onClick={handleCopy}>{copied ? "✅ 已复制" : "📋 复制人员"}</button>
-        <button className="btn" onClick={handleDownload}>{downloaded ? "✅ 已下载" : "📥 下载人员"}</button>
-        <button className="btn btn-primary" onClick={handleAllExport}>📦 导出全部</button>
+        <button className="btn btn-primary" onClick={handleAllExport}>📥 导出文件</button>
+        <button className="btn" onClick={handleCopy}>📋 复制数据</button>
       </div>
-      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>当前人员 ({workers.length} 人)</h3>
-      <pre>{JSON.stringify(workers, null, 2)}</pre>
 
-      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>导入人员数据</h3>
-      <textarea className="import-textarea" rows={6} placeholder="在此粘贴人员 JSON..." value={pasteText}
-        onChange={(e) => setPasteText(e.target.value)} />
-      <div className="btn-row" style={{ marginTop: 8 }}>
-        <button className="btn btn-primary" onClick={handlePasteImport} disabled={!pasteText.trim()}>📥 从粘贴导入</button>
-      </div>
-      <div className="import-area" style={{ marginTop: 12 }}>
-        <input type="file" accept=".json" onChange={handleFileImport} id="import-input" />
-        <label htmlFor="import-input" style={{ cursor: "pointer", display: "block" }}>
-          <p style={{ fontSize: 32, marginBottom: 4 }}>📂</p>
-          <p>或点击选择人员 JSON 文件</p>
+      <h3 style={{ fontSize: 15, marginTop: 32, marginBottom: 12, fontWeight: 600 }}>导入</h3>
+      <textarea className="import-textarea" rows={5} placeholder="粘贴导出的 JSON 数据..." value={importSource}
+        onChange={(e) => { setImportSource(e.target.value); setImportFileName(""); }} />
+      <div className="import-area" style={{ marginTop: 8 }}>
+        <input type="file" accept=".json" onChange={handleFileSelect} id="import-input" />
+        <label htmlFor="import-input" style={{ cursor: "pointer", display: "block", padding: "16px 20px" }}>
+          {importFileName
+            ? <span style={{ color: "var(--accent)", fontSize: 13 }}>已选择: {importFileName}</span>
+            : <span style={{ color: "var(--text-tertiary)", fontSize: 13 }}>📂 选择 JSON 文件</span>
+          }
         </label>
+      </div>
+      <div className="btn-row" style={{ marginTop: 12 }}>
+        <button className="btn btn-primary" onClick={() => doImport(importSource)} disabled={!importSource.trim()}>
+          确定导入
+        </button>
       </div>
     </div>
   );

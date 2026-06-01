@@ -69,3 +69,18 @@ export function exportAllData(positions, workers, orders, workdays) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * 复制全量数据到剪贴板
+ */
+export function copyAllData(positions, workers, orders, workdays) {
+  const data = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    positions,
+    workers,
+    orders,
+    workdays,
+  };
+  navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+}
