@@ -108,7 +108,7 @@ export default function App() {
             warnings={warnings}
             onGenerate={doGenerate}
             positions={positions}
-            priorities={priorities}
+            orders={orders}
           />
         )}
         {tab === "workers" && (
