@@ -254,3 +254,32 @@ body {
 /* ── Sunday toggle in positions panel ── */
 .sun-toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .sun-toggle input { cursor: pointer; }
+
+/* ── Priority Grid ── */
+.priority-grid {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+}
+.prio-grid-header {
+  display: flex; align-items: center; gap: 4px; padding: 4px 0;
+}
+.prio-row {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 0; border-top: 1px solid var(--border);
+}
+.prio-cell {
+  flex: 1; text-align: center; font-size: 12px; display: flex;
+  align-items: center; justify-content: center; gap: 2px;
+}
+.prio-cell.empty { flex: 0 0 80px; }
+.prio-cell.name { flex: 0 0 80px; font-weight: 600; font-size: 12px; justify-content: flex-start; }
+.prio-cell.day { font-weight: 600; color: var(--text-secondary); font-size: 11px; }
+.prio-cell.off { color: var(--text-muted); font-size: 11px; flex: 1; }
+.prio-input {
+  width: 36px; padding: 3px 0; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg); color: var(--text);
+  font-size: 12px; text-align: center; font-family: inherit; outline: none;
+}
+.prio-input:focus { border-color: var(--accent); }
+
+/* ── Placeholder worker cell ── */
+.pos-worker.placeholder { color: var(--text-muted); background: transparent; border: 1px dashed var(--border); }

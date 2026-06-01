@@ -1,5 +1,6 @@
-const STORAGE_KEY = "wd_workers";
+const WORKERS_KEY = "wd_workers";
 const POS_STORAGE_KEY = "wd_positions";
+const PRIORITY_STORAGE_KEY = "wd_pos_priorities";
 
 const DEFAULT_POSITIONS = [
   { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
@@ -10,6 +11,63 @@ const DEFAULT_POSITIONS = [
 
 let nextPosId = Date.now();
 
+/** 根据岗位列表生成默认的每日优先级表 */
+export function getDefaultPriorities(positions) {
+  const p = {};
+  for (const pos of positions) {
+    // [周一, 周二, 周三, 周四, 周五, 周六, 周日]
+    const arr = new Array(7).fill(9);
+    arr[5] = 0; // 周六全体休息
+    if (pos.id === "pos_dt") {
+      // 大堂优先最高，周日也是
+      for (let i = 0; i < 5; i++) arr[i] = 1;
+      arr[6] = 1;
+    } else if (pos.id === "pos_xj") {
+      for (let i = 0; i < 5; i++) arr[i] = 2;
+      arr[6] = 2;
+    } else if (pos.id === "pos_pt") {
+      for (let i = 0; i < 5; i++) arr[i] = 3;
+      arr[6] = 3;
+    } else if (pos.id === "pos_sq") {
+      // 授权岗周中 0（不需要），周日 3
+      for (let i = 0; i < 5; i++) arr[i] = 0;
+      arr[6] = 3;
+    }
+    p[pos.id] = arr;
+  }
+  return p;
+}
+
+export function loadPriorities(positions) {
+  try {
+    const raw = localStorage.getItem(PRIORITY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // 校验结构：确保每个岗位都有
+      const result = { ...parsed };
+      let needSave = false;
+      for (const pos of positions) {
+        if (!result[pos.id] || !Array.isArray(result[pos.id]) || result[pos.id].length !== 7) {
+          needSave = true;
+          break;
+        }
+      }
+      if (!needSave) {
+        // 确保多余的非当前岗位被清理？没必要，多余的只会在 bug 时残留
+        return result;
+      }
+    }
+  } catch {}
+  // 首次或结构不对重新生成
+  const def = getDefaultPriorities(positions);
+  savePriorities(def);
+  return def;
+}
+
+export function savePriorities(priorities) {
+  localStorage.setItem(PRIORITY_STORAGE_KEY, JSON.stringify(priorities));
+}
+
 export function loadPositions() {
   try {
     const raw = localStorage.getItem(POS_STORAGE_KEY);
@@ -18,18 +76,12 @@ export function loadPositions() {
       if (Array.isArray(arr) && arr.length > 0) return arr;
     }
   } catch {}
-  // 首次使用：写入默认值到 storage 并返回
   savePositions(DEFAULT_POSITIONS);
-  return DEFAULT_POSITIONS;
+  return [...DEFAULT_POSITIONS];
 }
 
 export function savePositions(positions) {
   localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(positions));
-}
-
-export function resetPositions() {
-  savePositions(DEFAULT_POSITIONS);
-  return DEFAULT_POSITIONS;
 }
 
 export function generatePosId() {
@@ -37,14 +89,33 @@ export function generatePosId() {
   return `pos_custom_${nextPosId}`;
 }
 
-/** Migrate legacy worker format (positionIds) to new format (positions array). */
+/**
+ * 根据岗位配置生成预设职员（首次使用）
+ * 每个岗位按 maxStaff 生成足量人员，每人只做一个岗
+ */
+export function getDefaultWorkers(positions) {
+  const workers = [];
+  let id = Date.now();
+  for (const pos of positions) {
+    for (let i = 0; i < pos.maxStaff; i++) {
+      const name = pos.name === "授权岗" && i === 0
+        ? "授权岗"
+        : `${pos.name}${i + 1}`;
+      workers.push({
+        id: id++,
+        name,
+        positions: [{ id: pos.id, priority: 1 }],
+        offDays: [],
+      });
+    }
+  }
+  return workers;
+}
+
+/** Migrate legacy worker format */
 function migrateWorker(w) {
   if (!w) return w;
-
-  // v2 format already
   if (w.positions && Array.isArray(w.positions)) return w;
-
-  // v1 format: positionIds string[] + optional positionPriorities map
   const oldPosIds = w.positionIds || [];
   const oldPriorities = w.positionPriorities || {};
   w.positions = oldPosIds.map((id) => ({
@@ -58,7 +129,7 @@ function migrateWorker(w) {
 
 export function loadWorkers() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(WORKERS_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
       if (Array.isArray(arr)) return arr.map(migrateWorker);
@@ -68,7 +139,7 @@ export function loadWorkers() {
 }
 
 export function saveWorkers(workers) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(workers));
+  localStorage.setItem(WORKERS_KEY, JSON.stringify(workers));
 }
 
 export function exportWorkers(workers) {

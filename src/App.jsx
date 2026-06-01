@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   loadWorkers,
   saveWorkers,
@@ -8,7 +8,9 @@ import {
   importWorkersFromText,
   loadPositions,
   savePositions,
-  resetPositions,
+  loadPriorities,
+  savePriorities,
+  getDefaultWorkers,
   generatePosId,
 } from "./config";
 import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
@@ -19,26 +21,36 @@ const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8", "#a29
 let nextWorkerId = Date.now();
 
 export default function App() {
-  const [tab, setTab] = useState("schedule");
-  const [workers, setWorkers] = useState(() => loadWorkers());
-  const [positions, setPositions] = useState(() => loadPositions());
+  const [positions] = useState(() => loadPositions());
+  const [priorities, setPriorities] = useState(() => loadPriorities(loadPositions()));
+  const [workers, setWorkers] = useState(() => {
+    const loaded = loadWorkers();
+    if (loaded.length > 0) return loaded;
+    const def = getDefaultWorkers(loadPositions());
+    saveWorkers(def);
+    return def;
+  });
   const [schedule, setSchedule] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [workerModal, setWorkerModal] = useState(null);
   const [status, setStatus] = useState("");
-  const [showWarnings, setShowWarnings] = useState(false); // 点击排班后才显示
 
   useEffect(() => { saveWorkers(workers); }, [workers]);
   useEffect(() => { savePositions(positions); }, [positions]);
+  useEffect(() => { savePriorities(priorities); }, [priorities]);
+
+  const totalNeed = positions.reduce((s, p) => s + p.minStaff * 6, 0);
+
+  // 排班 tab
+  const [tab, setTab] = useState("schedule");
 
   const doGenerate = useCallback(() => {
-    const s = generateSchedule({ workers, positions });
+    const s = generateSchedule({ workers, positions, priorities });
     setSchedule(s);
-    const ws = validateSchedule({ workers, positions }, s);
+    const ws = validateSchedule({ workers, positions, priorities }, s);
     setWarnings(ws);
-    setShowWarnings(true);
     setStatus(ws.length === 0 ? "✅ 排班生成完成" : `⚠️ 完成，但有${ws.length}条警告`);
-  }, [workers, positions]);
+  }, [workers, positions, priorities]);
 
   const addWorker = (data) => {
     if (workers.find((w) => w.name === data.name)) {
@@ -64,10 +76,14 @@ export default function App() {
   const updatePositions = (newPos) => {
     setPositions(newPos);
     setSchedule(null);
-    setShowWarnings(false);
+    setWarnings([]);
   };
 
-  const totalNeed = positions.reduce((s, p) => s + p.minStaff * 6, 0);
+  const updatePriorities = (newPrios) => {
+    setPriorities(newPrios);
+    setSchedule(null);
+    setWarnings([]);
+  };
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -89,9 +105,9 @@ export default function App() {
           <ScheduleView
             schedule={schedule}
             warnings={warnings}
-            showWarnings={showWarnings}
             onGenerate={doGenerate}
             positions={positions}
+            priorities={priorities}
           />
         )}
         {tab === "workers" && (
@@ -104,7 +120,13 @@ export default function App() {
           />
         )}
         {tab === "positions" && (
-          <PositionsView positions={positions} onChange={updatePositions} setStatus={setStatus} />
+          <PositionsView
+            positions={positions}
+            priorities={priorities}
+            onPositionsChange={updatePositions}
+            onPrioritiesChange={updatePriorities}
+            setStatus={setStatus}
+          />
         )}
         {tab === "export" && <ExportView workers={workers} setStatus={setStatus} onImport={(data) => { setWorkers(data); setStatus("✅ 人员已导入"); }} />}
 
@@ -124,64 +146,79 @@ export default function App() {
 }
 
 /* ════════════════════════════════════════
-   Schedule View
+   Schedule View — 始终显示岗位日历，点击按钮才排人
    ════════════════════════════════════════ */
-function ScheduleView({ schedule, warnings, showWarnings, onGenerate, positions }) {
+function ScheduleView({ schedule, warnings, onGenerate, positions, priorities }) {
+  const warningRef = useRef(null);
+
+  const handleGenerate = () => {
+    onGenerate();
+    // 滚到警告区域
+    setTimeout(() => {
+      warningRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  // 某岗位某天是否需要
+  const needOnDay = (posId, day) => {
+    if (day === 5) return false;
+    const prio = priorities?.[posId]?.[day] ?? 9;
+    if (prio <= 0) return false;
+    // 授权岗周一~周五
+    if (posId === "pos_sq" && day >= 0 && day <= 4) return false;
+    return true;
+  };
+
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
-        <strong>平日优先级：</strong>大堂 &gt; 现金柜员 &gt; 普通柜员 &nbsp;|&nbsp;
-        <strong>周日：</strong>大堂 &gt; 现金柜员 &gt; 普通柜员=授权岗
-      </p>
       <div className="btn-row">
-        <button className="btn btn-primary" onClick={onGenerate}>🔄 随机生成排班</button>
+        <button className="btn btn-primary" onClick={handleGenerate}>🔄 随机生成排班</button>
       </div>
-      {showWarnings && warnings.length > 0 && (
-        <div className="warning-panel" style={{ marginTop: 12 }}>
+
+      {/* 警告区域 */}
+      {warnings.length > 0 && (
+        <div ref={warningRef} className="warning-panel" style={{ marginTop: 12 }}>
           <div className="warning-title">⚠️ 排班警告 ({warnings.length})</div>
           {warnings.map((w, i) => <div key={i} className="warning-badge" style={{ marginTop: 4 }}>⚠️ {w}</div>)}
         </div>
       )}
-      {schedule ? (
-        <div className="schedule-grid">
-          {DAY_NAMES.map((dayName, day) => (
-            <div key={day} className={"day-col" + (day === 5 ? " day-off" : "")}>
-              <h3>{dayName}{day === 5 && <span className="rest-badge">固定休息</span>}</h3>
-              {day === 5 ? (
-                <div className="rest-msg">😴 全体休息</div>
-              ) : (
-                positions.map((pos, pi) => {
-                  if (!needPosOnDay(pos.id, day, positions)) return null;
-                  const assigned = schedule[day]?.[pos.id] || [];
-                  const short = assigned.length < pos.minStaff;
-                  return (
-                    <div key={pos.id} className="pos-block">
-                      <div className="pos-label" style={{ color: POS_COLORS[pi % POS_COLORS.length] }}>
-                        {pos.name} ({assigned.length}/{pos.minStaff}{pos.maxStaff !== pos.minStaff ? `~${pos.maxStaff}` : ''})
-                      </div>
-                      {assigned.length > 0 ? assigned.map((name, i) => (
+
+      {/* 日历始终显示 */}
+      <div className="schedule-grid" style={{ marginTop: 16 }}>
+        {DAY_NAMES.map((dayName, day) => (
+          <div key={day} className={"day-col" + (day === 5 ? " day-off" : "")}>
+            <h3>{dayName}{day === 5 && <span className="rest-badge">固定休息</span>}</h3>
+            {day === 5 ? (
+              <div className="rest-msg">😴 全体休息</div>
+            ) : (
+              positions.map((pos, pi) => {
+                if (!needOnDay(pos.id, day)) return null;
+                const assigned = schedule?.[day]?.[pos.id] || [];
+                const hasData = !!schedule;
+                const short = hasData && assigned.length < pos.minStaff;
+                return (
+                  <div key={pos.id} className="pos-block">
+                    <div className="pos-label" style={{ color: POS_COLORS[pi % POS_COLORS.length] }}>
+                      {pos.name} ({hasData ? assigned.length : "—"}/{pos.minStaff}{pos.maxStaff !== pos.minStaff ? `~${pos.maxStaff}` : ''})
+                    </div>
+                    {hasData ? (
+                      assigned.length > 0 ? assigned.map((name, i) => (
                         <div key={i} className={"pos-worker" + (short ? " short" : "")}>{name}</div>
                       )) : (
                         <div className="pos-worker short">— 无人 —</div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p style={{ marginTop: 24, color: "var(--text-secondary)" }}>点击"随机生成排班"按钮生成一周排班</p>
-      )}
+                      )
+                    ) : (
+                      <div className="pos-worker placeholder">— 待分配 —</div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
-}
-
-function needPosOnDay(posId, day, positions) {
-  if (day === 5) return false;
-  if (posId === "pos_sq" && day >= 0 && day <= 4) return false;
-  return true;
 }
 
 /* ════════════════════════════════════════
@@ -233,12 +270,11 @@ function WorkerCard({ worker: w, positions, onEdit, onDelete }) {
 }
 
 /* ════════════════════════════════════════
-   Positions View — 自定义岗位管理
+   Positions View — 岗位管理 + 每日优先级
    ════════════════════════════════════════ */
-function PositionsView({ positions, onChange, setStatus }) {
+function PositionsView({ positions, priorities, onPositionsChange, onPrioritiesChange, setStatus }) {
   const [editName, setEditName] = useState(() => positions.map((p) => p.name));
 
-  // 同步 editName 当 positions 从外部改变时
   useEffect(() => {
     setEditName(positions.map((p) => p.name));
   }, [positions]);
@@ -252,13 +288,18 @@ function PositionsView({ positions, onChange, setStatus }) {
       }
       return { ...p, [field]: v };
     });
-    onChange(next);
+    onPositionsChange(next);
   };
 
   const addPos = () => {
     const id = generatePosId();
     const next = [...positions, { id, name: "新岗位", minStaff: 1, maxStaff: 1 }];
-    onChange(next);
+    onPositionsChange(next);
+    // 为新岗位生成默认优先级
+    const newP = { ...priorities };
+    newP[id] = new Array(7).fill(9);
+    newP[id][5] = 0;
+    onPrioritiesChange(newP);
     setEditName(next.map((p) => p.name));
     setStatus("✅ 已添加新岗位");
   };
@@ -268,8 +309,13 @@ function PositionsView({ positions, onChange, setStatus }) {
       setStatus("⚠️ 至少保留一个岗位");
       return;
     }
+    const pos = positions[index];
     const next = positions.filter((_, i) => i !== index);
-    onChange(next);
+    onPositionsChange(next);
+    // 同时清理优先级
+    const newP = { ...priorities };
+    delete newP[pos.id];
+    onPrioritiesChange(newP);
     setStatus("✅ 已删除岗位");
   };
 
@@ -277,22 +323,35 @@ function PositionsView({ positions, onChange, setStatus }) {
     const next = positions.map((p, i) =>
       i === index ? { ...p, name: editName[i] || p.name } : p
     );
-    onChange(next);
+    onPositionsChange(next);
   };
 
-  const handleReset = () => {
-    const next = resetPositions();
-    onChange(next);
-    setStatus("✅ 已重置为默认岗位");
+  // 优先级编辑
+  const setDayPriority = (posId, day, value) => {
+    const v = Math.max(0, Math.min(99, parseInt(value) || 0));
+    const newP = { ...priorities, [posId]: [...(priorities[posId] || new Array(7).fill(9))] };
+    newP[posId][day] = v;
+    onPrioritiesChange(newP);
+  };
+
+  const adjustPrio = (posId, day, delta) => {
+    const cur = priorities?.[posId]?.[day] ?? 9;
+    setDayPriority(posId, day, cur + delta);
   };
 
   return (
     <div>
       <div className="btn-row">
         <button className="btn btn-primary" onClick={addPos}>+ 添加岗位</button>
-        <button className="btn btn-danger" onClick={handleReset}>↺ 恢复默认</button>
       </div>
+
+      {/* 岗位配置列表 */}
       <div className="pos-config-list">
+        <div className="pos-config-header">
+          <span style={{ flexBasis: 120 }}>岗位</span>
+          <span style={{ flexBasis: 80 }}>最少</span>
+          <span style={{ flexBasis: 80 }}>最多</span>
+        </div>
         {positions.map((pos, i) => (
           <div key={pos.id} className="pos-config-card">
             <div className="color-dot" style={{ background: POS_COLORS[i % POS_COLORS.length] }} />
@@ -323,12 +382,47 @@ function PositionsView({ positions, onChange, setStatus }) {
           </div>
         ))}
       </div>
+
+      {/* 每日优先级编辑 */}
+      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>每日岗位优先级（数字越小越优先，0=当天不需要）</h3>
+      <div className="priority-grid">
+        <div className="prio-grid-header">
+          <span className="prio-cell empty"></span>
+          {DAY_NAMES.map((d, i) => (
+            <span key={i} className={"prio-cell day" + (i === 5 ? " off" : "")}>{d}</span>
+          ))}
+        </div>
+        {positions.map((pos, pi) => (
+          <div key={pos.id} className="prio-row">
+            <span className="prio-cell name" style={{ color: POS_COLORS[pi % POS_COLORS.length] }}>{pos.name}</span>
+            {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+              const val = priorities?.[pos.id]?.[day] ?? 9;
+              return day === 5 ? (
+                <span key={day} className="prio-cell off">—</span>
+              ) : (
+                <span key={day} className="prio-cell">
+                  <button className="prio-btn" onClick={() => adjustPrio(pos.id, day, -1)}>−</button>
+                  <input
+                    className="prio-input"
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={val}
+                    onChange={(e) => setDayPriority(pos.id, day, e.target.value)}
+                  />
+                  <button className="prio-btn" onClick={() => adjustPrio(pos.id, day, +1)}>+</button>
+                </span>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 /* ════════════════════════════════════════
-   Export View — workers only
+   Export View
    ════════════════════════════════════════ */
 function ExportView({ workers, setStatus }) {
   const [copied, setCopied] = useState(false);
@@ -364,7 +458,7 @@ function ExportView({ workers, setStatus }) {
 
   return (
     <div className="export-section">
-      <p>岗位和人员都是可自定义的，导出数据包含人员信息。</p>
+      <p>岗位和人员都是可自定义的。导出数据包含人员信息。</p>
       <div className="btn-row">
         <button className="btn btn-primary" onClick={handleCopy}>{copied ? "✅ 已复制" : "📋 复制人员"}</button>
         <button className="btn" onClick={handleDownload}>{downloaded ? "✅ 已下载" : "📥 下载人员"}</button>
@@ -390,7 +484,7 @@ function ExportView({ workers, setStatus }) {
 }
 
 /* ════════════════════════════════════════
-   Worker Modal — with priority per position
+   Worker Modal
    ════════════════════════════════════════ */
 function WorkerModal({ initial, positions, onSave, onClose }) {
   const isEdit = !!initial;
@@ -441,7 +535,7 @@ function WorkerModal({ initial, positions, onSave, onClose }) {
                   <div key={p.id} className="pos-priority-row"
                     style={selected ? { borderColor: POS_COLORS[i % POS_COLORS.length], background: POS_COLORS[i % POS_COLORS.length] + "15" } : {}}
                     onClick={() => togglePos(p.id)}>
-                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i % POS_COLORS.length] } : {}}>{p.name} ({p.minStaff}{p.maxStaff !== p.minStaff ? `~${p.maxStaff}` : ''}人)</span>
+                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i % POS_COLORS.length] } : {}}>{p.name}</span>
                     {selected && (
                       <div className="prio-control" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="prio-btn" onClick={() => setPriority(p.id, -1)}>-</button>
