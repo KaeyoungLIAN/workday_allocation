@@ -87,7 +87,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div>
       <header className="app-header">
         <div>
           <h1>📋 排班分配器</h1>
@@ -101,7 +101,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="content" style={{ flex: 1 }}>
+      <div className="content">
         {tab === "schedule" && (
           <ScheduleView
             schedule={schedule}
