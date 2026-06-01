@@ -441,10 +441,91 @@ input, button, textarea { font-family: inherit; }
 }
 
 /* ── Responsive ── */
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .schedule-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 640px) {
+  .schedule-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .day-col { padding: 8px; }
+  .day-col h3 { font-size: 12px; }
+  .pos-label { font-size: 10px; }
+  .pos-worker { font-size: 11px; padding: 1px 6px; }
+}
+@media (max-width: 420px) {
+  .schedule-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+}
+
+@media (max-width: 700px) {
   .app-header { flex-wrap: wrap; gap: 10px; }
   .app-header > div:first-child { flex-direction: column; gap: 2px; }
+}
+@media (max-width: 640px) {
+  .app-header {
+    flex-direction: column; align-items: stretch; gap: 8px;
+    padding: 10px 14px;
+  }
+  .app-header > div:first-child { flex-direction: row; align-items: center; gap: 8px; }
+  .app-header h1 { font-size: 15px; }
+  .app-header > div:first-child span { font-size: 11px; }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 0; padding-bottom: 2px; }
+  .tab-btn { white-space: nowrap; flex-shrink: 0; font-size: 12px; padding: 6px 10px; }
+  .tab-btn.help-btn { width: 26px; padding: 6px 0; }
+  .content { padding: 16px 14px; }
+  .status-bar { padding: 6px 14px; font-size: 11px; }
+}
+
+/* ── Mobile: workers ── */
+@media (max-width: 640px) {
+  .worker-card { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+  .worker-card .name { min-width: auto; font-size: 13px; flex: 1; }
+  .worker-card .tags { order: 3; width: 100%; }
+  .worker-card .actions { gap: 2px; }
+}
+
+/* ── Mobile: positions config ── */
+@media (max-width: 640px) {
+  .pos-config-card {
+    flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+  }
+  .pos-config-card .name-input { width: 100%; order: -1; }
+  .pos-config-card .color-dot { order: -1; }
+  .pos-config-card .staff-input { width: 46px; }
+  .pos-config-card .btn-danger { margin-left: 0 !important; flex: 1; }
+}
+
+/* ── Mobile: day order card ── */
+@media (max-width: 640px) {
+  .day-order-card { margin-top: 6px; }
+  .day-order-header { padding: 9px 12px; }
+  .day-name { font-size: 13px; min-width: 30px; }
+  .day-order-body { padding: 0 12px 10px; padding-top: 6px; }
+  .pos-order-item { padding: 6px 8px; font-size: 12px; }
+  .drag-handle { font-size: 12px; }
+  .pos-order-name { font-size: 12px; }
+  .day-order-actions .btn-sm { font-size: 11px; padding: 4px 8px; }
+}
+
+/* ── Mobile: modal ── */
+@media (max-width: 640px) {
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 20px 16px; max-height: 85vh; overflow-y: auto;
+  }
+  .guide-modal { max-height: 90vh !important; }
+  .guide-modal-scroll { padding: 12px 16px; }
+  .guide-modal > h2 { padding: 16px 16px 0; }
+  .guide-modal-footer { padding: 10px 16px; flex-direction: column; gap: 8px; }
+  .guide-modal-footer .btn { width: 100%; justify-content: center; }
+  .form-actions { flex-direction: column; }
+  .form-actions .btn { width: 100%; justify-content: center; }
+}
+
+/* ── Mobile: export ── */
+@media (max-width: 640px) {
+  .export-section .btn-row { flex-direction: column; }
+  .export-section .btn { width: 100%; justify-content: center; }
+  .import-textarea { font-size: 11px; }
 }
 
 /* ── Guide Modal ── */
