@@ -485,12 +485,17 @@ input, button, textarea { font-family: inherit; }
 /* ── Mobile: positions config ── */
 @media (max-width: 640px) {
   .pos-config-card {
-    flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+    flex-wrap: wrap; gap: 4px; padding: 8px 10px;
   }
   .pos-config-card .name-input { width: 100%; order: -1; }
-  .pos-config-card .color-dot { order: -1; }
-  .pos-config-card .staff-input { width: 46px; }
-  .pos-config-card .btn-danger { margin-left: 0 !important; flex: 1; }
+  .pos-config-card .color-dot { align-self: flex-start; margin-top: 10px; }
+  .pos-config-card .label-text { font-size: 11px; }
+  .pos-config-card .staff-input {
+    width: 60px; height: 38px; font-size: 16px;
+    touch-action: manipulation;
+    -webkit-appearance: none; appearance: none;
+  }
+  .pos-config-card .btn-danger { margin-left: auto; }
 }
 
 /* ── Mobile: day order card ── */
