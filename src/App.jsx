@@ -581,6 +581,45 @@ function DayOrderCard({
 }
 
 /* ════════════════════════════════════════
+   使用说明 Modal
+   ════════════════════════════════════════ */
+function GuideModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <h2>使用说明</h2>
+        <div style={{ fontSize: 13, lineHeight: 1.8, color: "var(--text-secondary)" }}>
+          <p><strong style={{ color: "var(--text-primary)" }}>排班表</strong></p>
+          <p>— 页面默认显示一周七天的岗位日历（待分配状态）。</p>
+          <p>— 点击「随机生成排班」自动分配人员到各岗位。</p>
+          <p>— 生成后如有人员不足会显示警告。点击「导出排班」可下载 Excel 文件。</p>
+
+          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>人员</strong></p>
+          <p>— 添加/编辑人员：设置姓名、所属岗位（可多选，拖拽排序确定优先级）、休息日。</p>
+          <p>— 每个人的岗位顺序（拖拽）决定了当多个岗位需要人时该人优先去哪个岗位。</p>
+
+          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>岗位</strong></p>
+          <p>— 自定义岗位名称和每个岗位最少/最多需要的人数。</p>
+          <p>— 点击日期按钮切换工作日（默认周一~周五 + 周日工作，周六休息）。</p>
+          <p>— 展开每日卡片，拖拽调整当天岗位优先级（越靠上越优先）。点击全选/清空快速设置。</p>
+
+          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>导出</strong></p>
+          <p>— 导出文件/复制数据：包含全部配置（岗位、人员、排序、工作日）。</p>
+          <p>— 导入：粘贴数据或选择文件后，点击「确定导入」，刷新页面生效。</p>
+
+          <p style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
+            数据全部保存在浏览器本地（localStorage），不会上传到任何服务器。
+          </p>
+        </div>
+        <div className="form-actions">
+          <button className="btn btn-primary" onClick={onClose}>知道了</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
    Export View — 导入/导出全部
    ════════════════════════════════════════ */
 function ExportView({ workers, positions, orders, workdays, setStatus }) {
