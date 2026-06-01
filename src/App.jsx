@@ -315,8 +315,9 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
       if (i !== index) return p;
       let v = value;
       if (field === "minStaff" || field === "maxStaff") {
-        v = Math.max(1, parseInt(value) || 1);
-        if (v > 20) v = 20;
+        const parsed = parseInt(value, 10);
+        if (isNaN(parsed)) return;
+        v = Math.max(1, Math.min(20, parsed));
       }
       return { ...p, [field]: v };
     });
