@@ -303,12 +303,24 @@ function WorkerCard({ worker: w, positions, onEdit, onDelete }) {
    ════════════════════════════════════════ */
 function PositionsView({ positions, orders, workdays, onPositionsChange, onOrdersChange, onWorkdaysChange, setStatus }) {
   const [editName, setEditName] = useState(() => positions.map((p) => p.name));
+  const [editStaff, setEditStaff] = useState(() => positions.map(() => ({})));
   const [expandedDay, setExpandedDay] = useState(null);
   const [dragIdx, setDragIdx] = useState(null);
 
   useEffect(() => {
     setEditName(positions.map((p) => p.name));
+    setEditStaff((prev) => {
+      if (prev.length === positions.length) return prev;
+      const n = positions.map(() => ({}));
+      prev.forEach((v, i) => { if (i < n.length) n[i] = v; });
+      return n;
+    });
   }, [positions]);
+
+  const getEditVal = (i, field) => {
+    const v = editStaff[i]?.[field];
+    return v !== undefined ? v : String(positions[i][field]);
+  };
 
   const updatePos = (index, field, value) => {
     const next = positions.map((p, i) => {
@@ -334,6 +346,7 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
     }
     onOrdersChange(newO);
     setEditName(next.map((p) => p.name));
+    setEditStaff((prev) => { const n = [...prev]; n.push({}); return n; });
     setStatus("✅ 已添加新岗位");
   };
 
@@ -352,6 +365,7 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
       }
     }
     onOrdersChange(newO);
+    setEditStaff((prev) => { const n = [...prev]; n.splice(index, 1); return n; });
     setStatus("✅ 已删除岗位");
   };
 
@@ -436,7 +450,12 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
               className="staff-input"
               type="text"
               inputMode="numeric"
-              defaultValue={pos.minStaff}
+              value={getEditVal(i, "minStaff")}
+              onChange={(e) => setEditStaff((prev) => {
+                const next = [...prev];
+                next[i] = { ...(next[i] || {}), minStaff: e.target.value };
+                return next;
+              })}
               onBlur={(e) => updatePos(i, "minStaff", e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
             />
@@ -445,7 +464,12 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
               className="staff-input"
               type="text"
               inputMode="numeric"
-              defaultValue={pos.maxStaff}
+              value={getEditVal(i, "maxStaff")}
+              onChange={(e) => setEditStaff((prev) => {
+                const next = [...prev];
+                next[i] = { ...(next[i] || {}), maxStaff: e.target.value };
+                return next;
+              })}
               onBlur={(e) => updatePos(i, "maxStaff", e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
             />
