@@ -366,6 +366,7 @@ input, button, textarea { font-family: inherit; }
 .pos-order-item:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
 .pos-order-item:active { cursor: grabbing; }
 .pos-order-item.dragging { opacity: 0.5; border-style: dashed; }
+.pos-order-item.touch-dragging { opacity: 0.6; box-shadow: var(--shadow-elevated); transform: scale(1.03); }
 .drag-handle { color: var(--text-muted); font-size: 14px; cursor: grab; user-select: none; }
 .pos-order-name { font-weight: 500; font-size: 13px; flex: 1; }
 .btn-remove {

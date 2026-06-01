@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTouchDrag } from "./touchDrag";
 import {
   loadWorkers,
   saveWorkers,
@@ -498,6 +499,14 @@ function DayOrderCard({
   const isExpanded = expandedDay === day;
   const list = orders[dayStr] || [];
   const activeCount = list.length;
+  const listRef = useRef(null);
+
+  // 移动端 touch 拖拽
+  useTouchDrag(listRef, {
+    onDragStart: (idx) => onDragStart(dayStr, idx),
+    onDragOver: (e, _, idx) => onDragOver(e, dayStr, idx),
+    onDragEnd,
+  });
 
   const toggleExpand = () => {
     setExpandedDay(isExpanded ? null : day);
@@ -532,7 +541,7 @@ function DayOrderCard({
             <button className="btn btn-sm" onClick={() => onClear(dayStr)}>清空</button>
           </div>
           {/* 已选中的岗位列表（可拖拽排序） */}
-          <div className="pos-order-list">
+          <div className="pos-order-list" ref={listRef}>
             {list.map((id, idx) => {
               const pos = positions.find((p) => p.id === id);
               const pi = positions.indexOf(pos);
@@ -544,6 +553,7 @@ function DayOrderCard({
                   onDragStart={(e) => handleDragStartInner(e, idx)}
                   onDragOver={(e) => onDragOver(e, dayStr, idx)}
                   onDragEnd={onDragEnd}
+                  data-sort-idx={idx}
                   style={{ borderLeftColor: POS_COLORS[pi % POS_COLORS.length] }}
                 >
                   <span className="drag-handle">⠿</span>
@@ -720,6 +730,21 @@ function WorkerModal({ initial, positions, onSave, onClose }) {
   const [workerPos, setWorkerPos] = useState(initial?.positions || []);
   const [offDays, setOffDays] = useState(initial?.offDays || []);
   const [dragIdx, setDragIdx] = useState(null);
+  const workerListRef = useRef(null);
+
+  // 移动端 touch 拖拽
+  useTouchDrag(workerListRef, {
+    onDragStart: (idx) => { setDragIdx(idx); },
+    onDragOver: (e, fromIdx, toIdx) => {
+      if (dragIdx === null || dragIdx === toIdx) return;
+      const list = [...workerPos];
+      const [moved] = list.splice(dragIdx, 1);
+      list.splice(toIdx, 0, moved);
+      setWorkerPos(list);
+      setDragIdx(toIdx);
+    },
+    onDragEnd: () => setDragIdx(null),
+  });
 
   const togglePos = (posId) => {
     setWorkerPos((prev) => {
@@ -769,7 +794,7 @@ function WorkerModal({ initial, positions, onSave, onClose }) {
               {workerPos.length > 0 && (
                 <>
                   <div className="unselected-label">已选中：</div>
-                  <div className="pos-order-list" style={{ marginBottom: 6 }}>
+                  <div className="pos-order-list" style={{ marginBottom: 6 }} ref={workerListRef}>
                     {workerPos.map((pw, idx) => {
                       const pos = positions.find((p) => p.id === pw.id);
                       const pi = positions.indexOf(pos);
@@ -781,6 +806,7 @@ function WorkerModal({ initial, positions, onSave, onClose }) {
                           onDragStart={(e) => handleDragStart(e, idx)}
                           onDragOver={(e) => handleDragOver(e, idx)}
                           onDragEnd={handleDragEnd}
+                          data-sort-idx={idx}
                           style={{ borderLeftColor: POS_COLORS[pi % POS_COLORS.length] }}
                         >
                           <span className="drag-handle">⠿</span>
