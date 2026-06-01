@@ -586,32 +586,43 @@ function DayOrderCard({
 function GuideModal({ onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+      <div className="modal guide-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <h2>使用说明</h2>
-        <div style={{ fontSize: 13, lineHeight: 1.8, color: "var(--text-secondary)" }}>
-          <p><strong style={{ color: "var(--text-primary)" }}>排班表</strong></p>
-          <p>— 页面默认显示一周七天的岗位日历（待分配状态）。</p>
-          <p>— 点击「随机生成排班」自动分配人员到各岗位。</p>
-          <p>— 生成后如有人员不足会显示警告。点击「导出排班」可下载 Excel 文件。</p>
-
-          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>人员</strong></p>
-          <p>— 添加/编辑人员：设置姓名、所属岗位（可多选，拖拽排序确定优先级）、休息日。</p>
-          <p>— 每个人的岗位顺序（拖拽）决定了当多个岗位需要人时该人优先去哪个岗位。</p>
-
-          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>岗位</strong></p>
-          <p>— 自定义岗位名称和每个岗位最少/最多需要的人数。</p>
-          <p>— 点击日期按钮切换工作日（默认周一~周五 + 周日工作，周六休息）。</p>
-          <p>— 展开每日卡片，拖拽调整当天岗位优先级（越靠上越优先）。点击全选/清空快速设置。</p>
-
-          <p style={{ marginTop: 12 }}><strong style={{ color: "var(--text-primary)" }}>导出</strong></p>
-          <p>— 导出文件/复制数据：包含全部配置（岗位、人员、排序、工作日）。</p>
-          <p>— 导入：粘贴数据或选择文件后，点击「确定导入」，刷新页面生效。</p>
-
-          <p style={{ marginTop: 12, color: "var(--text-muted)", fontSize: 12 }}>
-            数据全部保存在浏览器本地（localStorage），不会上传到任何服务器。
-          </p>
+        <div className="guide-modal-scroll">
+          <section>
+            <h3>排班表</h3>
+            <ul>
+              <li>页面默认显示一周七天的岗位日历，标记了每个岗位需要的人数。</li>
+              <li>点击【随机生成排班】自动分配人员到各岗位。</li>
+              <li>生成后如有人员不足会显示警告。点击右侧【导出排班】可下载 Excel。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>人员</h3>
+            <ul>
+              <li>添加/编辑人员：设置姓名、所属岗位、休息日。</li>
+              <li>每人可选择多个岗位，拖拽排序决定优先顺序（越靠上越优先去该岗位）。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>岗位</h3>
+            <ul>
+              <li>自定义岗位名称和每个岗位最少/最多需要的人数。</li>
+              <li>点击日期按钮切换工作日（默认周一~周五 + 周日工作，周六休息）。</li>
+              <li>展开每日卡片，拖拽调整当天各岗位的优先级（越靠上越优先分配人员）。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>导出 / 导入</h3>
+            <ul>
+              <li>【导出文件】下载全部配置（岗位、人员、排序、工作日）为 .json。</li>
+              <li>【复制数据】将相同内容复制到剪贴板。</li>
+              <li>导入：粘贴数据或选择文件后，点击【确定导入】，刷新页面生效。</li>
+            </ul>
+          </section>
         </div>
-        <div className="form-actions">
+        <div className="guide-modal-footer">
+          <p className="guide-modal-note">数据全部保存在浏览器本地，不会上传任何服务器。</p>
           <button className="btn btn-primary" onClick={onClose}>知道了</button>
         </div>
       </div>

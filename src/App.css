@@ -458,3 +458,32 @@ input, button, textarea { font-family: inherit; }
 /* ── Sun toggle (legacy, kept for compat) ── */
 .sun-toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
 .sun-toggle input { cursor: pointer; }
+
+/* ── Guide Modal ── */
+.guide-modal {
+  max-height: 80vh; display: flex; flex-direction: column; padding: 0 !important;
+  background: var(--bg-surface); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.guide-modal > h2 {
+  padding: 20px 24px 0; margin-bottom: 0;
+}
+.guide-modal-scroll {
+  flex: 1; overflow-y: auto; padding: 16px 24px;
+}
+.guide-modal-scroll section { margin-bottom: 16px; }
+.guide-modal-scroll section:last-child { margin-bottom: 0; }
+.guide-modal-scroll h3 {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.guide-modal-scroll ul {
+  margin: 0; padding-left: 18px; color: var(--text-secondary);
+  font-size: 13px; line-height: 1.7;
+}
+.guide-modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px; border-top: 1px solid var(--border-glass);
+}
+.guide-modal-note {
+  font-size: 11px; color: var(--text-muted); margin: 0;
+}
