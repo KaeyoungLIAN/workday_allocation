@@ -10,11 +10,15 @@ import {
   savePositions,
   loadOrders,
   saveOrders,
+  loadWorkdays,
+  saveWorkdays,
   getDefaultOrders,
   getDefaultWorkers,
   generatePosId,
+  ALL_DAYS,
 } from "./config";
 import { generateSchedule, validateSchedule, DAY_NAMES } from "./scheduler";
+import { exportScheduleXlsx, exportAllData } from "./export";
 import "./App.css";
 
 const POS_COLORS = ["#6c5ce7", "#00b894", "#fdcb6e", "#e17055", "#fd79a8", "#a29bfe", "#fab1a0", "#55efc4"];
@@ -23,7 +27,8 @@ let nextWorkerId = Date.now();
 
 export default function App() {
   const [positions] = useState(() => loadPositions());
-  const [orders, setOrders] = useState(() => loadOrders(loadPositions()));
+  const [workdays, setWorkdays] = useState(() => loadWorkdays());
+  const [orders, setOrders] = useState(() => loadOrders(loadPositions(), loadWorkdays()));
   const [workers, setWorkers] = useState(() => {
     const loaded = loadWorkers();
     if (loaded.length > 0) return loaded;
@@ -39,19 +44,20 @@ export default function App() {
   useEffect(() => { saveWorkers(workers); }, [workers]);
   useEffect(() => { savePositions(positions); }, [positions]);
   useEffect(() => { saveOrders(orders); }, [orders]);
+  useEffect(() => { saveWorkdays(workdays); }, [workdays]);
 
-  const totalNeed = positions.reduce((s, p) => s + p.minStaff * 6, 0);
+  const totalNeed = positions.reduce((s, p) => s + p.minStaff * workdays.length, 0);
 
   // 排班 tab
   const [tab, setTab] = useState("schedule");
 
   const doGenerate = useCallback(() => {
-    const s = generateSchedule({ workers, positions, orders });
+    const s = generateSchedule({ workers, positions, orders, workdays });
     setSchedule(s);
-    const ws = validateSchedule({ workers, positions, orders }, s);
+    const ws = validateSchedule({ workers, positions, orders, workdays }, s);
     setWarnings(ws);
     setStatus(ws.length === 0 ? "✅ 排班生成完成" : `⚠️ 完成，但有${ws.length}条警告`);
-  }, [workers, positions, orders]);
+  }, [workers, positions, orders, workdays]);
 
   const addWorker = (data) => {
     if (workers.find((w) => w.name === data.name)) {
@@ -91,7 +97,7 @@ export default function App() {
       <header className="app-header">
         <div>
           <h1>📋 排班分配器</h1>
-          <span>{workers.length} 人 · {positions.length} 岗位 · 周需 {totalNeed} 人次 · 周六固定休息</span>
+          <span>{workers.length} 人 · {positions.length} 岗位 · 周需 {totalNeed} 人次 · {workdays.length}工作日</span>
         </div>
         <div className="tabs">
           <button className={"tab-btn" + (tab === "schedule" ? " active" : "")} onClick={() => setTab("schedule")}>🗓 排班表</button>
@@ -109,6 +115,7 @@ export default function App() {
             onGenerate={doGenerate}
             positions={positions}
             orders={orders}
+            workdays={workdays}
           />
         )}
         {tab === "workers" && (
@@ -124,12 +131,14 @@ export default function App() {
           <PositionsView
             positions={positions}
             orders={orders}
+            workdays={workdays}
             onPositionsChange={updatePositions}
             onOrdersChange={updateOrders}
+            onWorkdaysChange={setWorkdays}
             setStatus={setStatus}
           />
         )}
-        {tab === "export" && <ExportView workers={workers} setStatus={setStatus} onImport={(data) => { setWorkers(data); setStatus("✅ 人员已导入"); }} />}
+        {tab === "export" && <ExportView workers={workers} positions={positions} orders={orders} workdays={workdays} setStatus={setStatus} onImport={(data) => { setWorkers(data); setStatus("✅ 人员已导入"); }} />}
 
         {workerModal && (
           <WorkerModal
@@ -149,7 +158,7 @@ export default function App() {
 /* ════════════════════════════════════════
    Schedule View — 始终显示岗位日历，点击按钮才排人
    ════════════════════════════════════════ */
-function ScheduleView({ schedule, warnings, onGenerate, positions, orders }) {
+function ScheduleView({ schedule, warnings, onGenerate, positions, orders, workdays }) {
   const warningRef = useRef(null);
 
   const handleGenerate = () => {
@@ -159,17 +168,26 @@ function ScheduleView({ schedule, warnings, onGenerate, positions, orders }) {
     }, 100);
   };
 
+  const isOffDay = (day) => !workdays.includes(day);
+
   // 某岗位某天是否在排序中
   const needOnDay = (posId, day) => {
-    if (day === 5) return false;
+    if (!workdays.includes(day)) return false;
     const order = orders?.[String(day)] || [];
     return order.includes(posId);
   };
 
+  const handleExportXlsx = () => {
+    if (!schedule) { setStatus("请先生成排班"); return; }
+    exportScheduleXlsx(schedule, positions, orders, workdays);
+    setStatus("✅ 排班表已导出");
+  };
+
   return (
     <div>
-      <div className="btn-row">
+      <div className="btn-row" style={{ justifyContent: "space-between" }}>
         <button className="btn btn-primary" onClick={handleGenerate}>🔄 随机生成排班</button>
+        <button className="btn" onClick={handleExportXlsx} disabled={!schedule}>📥 导出排班</button>
       </div>
 
       {/* 警告区域 */}
@@ -183,10 +201,10 @@ function ScheduleView({ schedule, warnings, onGenerate, positions, orders }) {
       {/* 日历始终显示 */}
       <div className="schedule-grid" style={{ marginTop: 16 }}>
         {DAY_NAMES.map((dayName, day) => (
-          <div key={day} className={"day-col" + (day === 5 ? " day-off" : "")}>
-            <h3>{dayName}{day === 5 && <span className="rest-badge">固定休息</span>}</h3>
-            {day === 5 ? (
-              <div className="rest-msg">😴 全体休息</div>
+          <div key={day} className={"day-col" + (isOffDay(day) ? " day-off" : "")}>
+            <h3>{dayName}{isOffDay(day) && <span className="rest-badge">休息</span>}</h3>
+            {isOffDay(day) ? (
+              <div className="rest-msg">😴 休息</div>
             ) : (
               positions.map((pos, pi) => {
                 if (!needOnDay(pos.id, day)) return null;
@@ -241,19 +259,18 @@ function WorkersView({ workers, positions, onAdd, onEdit, onDelete }) {
 }
 
 function WorkerCard({ worker: w, positions, onEdit, onDelete }) {
-  const posInfos = (w.positions || []).map((pw) => {
-    const pos = positions.find((p) => p.id === pw.id);
-    return { name: pos?.name || pw.id, priority: pw.priority ?? 3 };
-  });
   return (
     <div className="worker-card">
       <div className="name">{w.name}</div>
       <div className="tags">
-        {posInfos.map((pi) => (
-          <span key={pi.name} className="tag green" title={`优先级 ${pi.priority}（越小越高）`}>
-            {pi.name} ⭐{pi.priority}
-          </span>
-        ))}
+        {(w.positions || []).map((pw) => {
+          const pos = positions.find((p) => p.id === pw.id);
+          return (
+            <span key={pw.id} className="tag green">
+              {pos?.name || pw.id}
+            </span>
+          );
+        })}
         {w.offDays.length > 0 && (
           <span className="tag off">休{DAY_NAMES.filter((_, d) => w.offDays.includes(d)).join("、")}</span>
         )}
@@ -267,12 +284,9 @@ function WorkerCard({ worker: w, positions, onEdit, onDelete }) {
 }
 
 /* ════════════════════════════════════════
-   Positions View — 岗位管理 + 每日拖拽排序
+   Positions View — 岗位管理 + 每日拖拽排序 + 工作日配置
    ════════════════════════════════════════ */
-const WORK_DAYS = [0, 1, 2, 3, 4, 6]; // 周一~周五 + 周日
-const SATURDAY = 5;
-
-function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, setStatus }) {
+function PositionsView({ positions, orders, workdays, onPositionsChange, onOrdersChange, onWorkdaysChange, setStatus }) {
   const [editName, setEditName] = useState(() => positions.map((p) => p.name));
   const [expandedDay, setExpandedDay] = useState(null);
   const [dragIdx, setDragIdx] = useState(null);
@@ -297,9 +311,8 @@ function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, s
     const id = generatePosId();
     const next = [...positions, { id, name: "新岗位", minStaff: 1, maxStaff: 1 }];
     onPositionsChange(next);
-    // 新岗位加入所有工作日的排序末尾
     const newO = { ...orders };
-    for (const day of [...WORK_DAYS]) {
+    for (const day of workdays) {
       newO[String(day)] = [...(newO[String(day)] || []), id];
     }
     onOrdersChange(newO);
@@ -315,9 +328,8 @@ function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, s
     const pos = positions[index];
     const next = positions.filter((_, i) => i !== index);
     onPositionsChange(next);
-    // 从所有排序中移除
     const newO = { ...orders };
-    for (const day of [...WORK_DAYS, SATURDAY]) {
+    for (const day of ALL_DAYS) {
       if (newO[String(day)]) {
         newO[String(day)] = newO[String(day)].filter((id) => id !== pos.id);
       }
@@ -333,11 +345,31 @@ function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, s
     onPositionsChange(next);
   };
 
-  // ── 拖拽排序逻辑 ──
-  const handleDragStart = (dayStr, index) => {
-    setDragIdx(index);
+  // ── 工作日切换 ──
+  const toggleWorkday = (day) => {
+    let next;
+    if (workdays.includes(day)) {
+      if (workdays.length <= 1) {
+        setStatus("⚠️ 至少保留一个工作日");
+        return;
+      }
+      next = workdays.filter((d) => d !== day);
+    } else {
+      next = [...workdays, day].sort();
+    }
+    onWorkdaysChange(next);
+    // 新工作日如果没有排序数据，生成默认
+    const newO = { ...orders };
+    for (const d of next) {
+      if (!newO[String(d)] || newO[String(d)].length === 0) {
+        newO[String(d)] = positions.map((p) => p.id);
+      }
+    }
+    onOrdersChange(newO);
   };
 
+  // ── 拖拽排序逻辑 ──
+  const handleDragStart = (dayStr, index) => { setDragIdx(index); };
   const handleDragOver = (e, dayStr, index) => {
     e.preventDefault();
     if (dragIdx === null || dragIdx === index) return;
@@ -347,30 +379,19 @@ function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, s
     onOrdersChange({ ...orders, [dayStr]: list });
     setDragIdx(index);
   };
+  const handleDragEnd = () => { setDragIdx(null); };
 
-  const handleDragEnd = () => {
-    setDragIdx(null);
-  };
-
-  // 切换某岗位在某天的开关（加入/移除排序）
   const togglePosDay = (posId, dayStr) => {
     const list = [...(orders[dayStr] || [])];
     const idx = list.indexOf(posId);
-    if (idx >= 0) {
-      list.splice(idx, 1);
-    } else {
-      list.push(posId);
-    }
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(posId);
     onOrdersChange({ ...orders, [dayStr]: list });
   };
 
-  // 快捷：选中全部岗位到某天
   const fillDay = (dayStr) => {
-    const list = positions.map((p) => p.id);
-    onOrdersChange({ ...orders, [dayStr]: list });
+    onOrdersChange({ ...orders, [dayStr]: positions.map((p) => p.id) });
   };
-
-  // 快捷：清空某天
   const clearDay = (dayStr) => {
     onOrdersChange({ ...orders, [dayStr]: [] });
   };
@@ -414,92 +435,40 @@ function PositionsView({ positions, orders, onPositionsChange, onOrdersChange, s
         ))}
       </div>
 
-      {/* 每日排序卡片 */}
-      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>每日岗位顺序（拖拽调整优先级）</h3>
-      <DayOrderCard
-        day={0} name="周一"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
-      <DayOrderCard
-        day={1} name="周二"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
-      <DayOrderCard
-        day={2} name="周三"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
-      <DayOrderCard
-        day={3} name="周四"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
-      <DayOrderCard
-        day={4} name="周五"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
-      <div className="day-order-card day-off">
-        <div className="day-order-header">
-          <span className="day-name">周六</span>
-          <span className="day-status">固定休息</span>
-        </div>
+      {/* 工作日配置 */}
+      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>工作日（点击切换）</h3>
+      <div className="checkbox-group">
+        {ALL_DAYS.map((d) => (
+          <button
+            key={d}
+            className={"checkbox-btn" + (workdays.includes(d) ? " selected" : "")}
+            onClick={() => toggleWorkday(d)}
+          >
+            {DAY_NAMES[d]}
+          </button>
+        ))}
       </div>
-      <DayOrderCard
-        day={6} name="周日"
-        orders={orders} positions={positions}
-        onToggle={togglePosDay}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        dragIdx={dragIdx}
-        expandedDay={expandedDay}
-        setExpandedDay={setExpandedDay}
-        onFill={fillDay}
-        onClear={clearDay}
-      />
+
+      {/* 每日排序卡片 — 只显示工作日 */}
+      <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>每日岗位顺序（拖拽调整优先级）</h3>
+      {workdays.sort().map((day) => (
+        <DayOrderCard
+          key={day}
+          day={day}
+          name={DAY_NAMES[day]}
+          orders={orders}
+          positions={positions}
+          onToggle={togglePosDay}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          dragIdx={dragIdx}
+          expandedDay={expandedDay}
+          setExpandedDay={setExpandedDay}
+          onFill={fillDay}
+          onClear={clearDay}
+        />
+      ))}
     </div>
   );
 }
@@ -600,13 +569,14 @@ function DayOrderCard({
 /* ════════════════════════════════════════
    Export View
    ════════════════════════════════════════ */
-function ExportView({ workers, setStatus }) {
+function ExportView({ workers, positions, orders, workdays, setStatus }) {
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [pasteText, setPasteText] = useState("");
 
   const handleCopy = () => { copyWorkers(workers); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const handleDownload = () => { exportWorkers(workers); setDownloaded(true); setTimeout(() => setDownloaded(false), 2000); };
+  const handleAllExport = () => { exportAllData(positions, workers, orders, workdays); setStatus("✅ 全量数据已导出"); };
 
   const handlePasteImport = () => {
     try {
@@ -634,10 +604,11 @@ function ExportView({ workers, setStatus }) {
 
   return (
     <div className="export-section">
-      <p>岗位和人员都是可自定义的。导出数据包含人员信息。</p>
+      <p>岗位和人员都是可自定义的。</p>
       <div className="btn-row">
         <button className="btn btn-primary" onClick={handleCopy}>{copied ? "✅ 已复制" : "📋 复制人员"}</button>
         <button className="btn" onClick={handleDownload}>{downloaded ? "✅ 已下载" : "📥 下载人员"}</button>
+        <button className="btn btn-primary" onClick={handleAllExport}>📦 导出全部</button>
       </div>
       <h3 style={{ fontSize: 14, marginTop: 24, marginBottom: 8 }}>当前人员 ({workers.length} 人)</h3>
       <pre>{JSON.stringify(workers, null, 2)}</pre>
@@ -660,29 +631,39 @@ function ExportView({ workers, setStatus }) {
 }
 
 /* ════════════════════════════════════════
-   Worker Modal
+   Worker Modal — 拖拽排序岗位
    ════════════════════════════════════════ */
 function WorkerModal({ initial, positions, onSave, onClose }) {
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || "");
   const [workerPos, setWorkerPos] = useState(initial?.positions || []);
   const [offDays, setOffDays] = useState(initial?.offDays || []);
+  const [dragIdx, setDragIdx] = useState(null);
 
   const togglePos = (posId) => {
     setWorkerPos((prev) => {
       const existing = prev.find((p) => p.id === posId);
-      return existing ? prev.filter((p) => p.id !== posId) : [...prev, { id: posId, priority: 3 }];
+      if (existing) return prev.filter((p) => p.id !== posId);
+      return [...prev, { id: posId }];
     });
   };
 
-  const setPriority = (posId, delta) => {
-    setWorkerPos((prev) => prev.map((p) =>
-      p.id === posId ? { ...p, priority: Math.max(1, Math.min(10, (p.priority || 3) + delta)) } : p
-    ));
+  const handleDragStart = (e, idx) => {
+    e.dataTransfer.effectAllowed = "move";
+    setDragIdx(idx);
   };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    const list = [...workerPos];
+    const [moved] = list.splice(dragIdx, 1);
+    list.splice(idx, 0, moved);
+    setWorkerPos(list);
+    setDragIdx(idx);
+  };
+  const handleDragEnd = () => setDragIdx(null);
 
   const toggleOff = (d) => {
-    if (d === 5) return;
     setOffDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
   };
 
@@ -702,38 +683,65 @@ function WorkerModal({ initial, positions, onSave, onClose }) {
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="请输入姓名" autoFocus />
           </div>
           <div className="form-group">
-            <label>岗位与优先级（数字越小优先级越高，至少选一个）</label>
-            <div className="pos-priority-grid">
-              {positions.map((p, i) => {
-                const entry = workerPos.find((ep) => ep.id === p.id);
-                const selected = !!entry;
-                return (
-                  <div key={p.id} className="pos-priority-row"
-                    style={selected ? { borderColor: POS_COLORS[i % POS_COLORS.length], background: POS_COLORS[i % POS_COLORS.length] + "15" } : {}}
-                    onClick={() => togglePos(p.id)}>
-                    <span className="pos-prio-name" style={selected ? { color: POS_COLORS[i % POS_COLORS.length] } : {}}>{p.name}</span>
-                    {selected && (
-                      <div className="prio-control" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="prio-btn" onClick={() => setPriority(p.id, -1)}>-</button>
-                        <span className="prio-value">{entry.priority ?? 3}</span>
-                        <button type="button" className="prio-btn" onClick={() => setPriority(p.id, +1)}>+</button>
-                      </div>
-                    )}
+            <label>岗位（拖拽排序，越靠上越优先）</label>
+            <div className="worker-pos-drag">
+              {workerPos.length > 0 && (
+                <>
+                  <div className="unselected-label">已选中：</div>
+                  <div className="pos-order-list" style={{ marginBottom: 6 }}>
+                    {workerPos.map((pw, idx) => {
+                      const pos = positions.find((p) => p.id === pw.id);
+                      const pi = positions.indexOf(pos);
+                      return (
+                        <div
+                          key={pw.id}
+                          className={"pos-order-item" + (dragIdx === idx ? " dragging" : "")}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragOver={(e) => handleDragOver(e, idx)}
+                          onDragEnd={handleDragEnd}
+                          style={{ borderLeftColor: POS_COLORS[pi % POS_COLORS.length] }}
+                        >
+                          <span className="drag-handle">⠿</span>
+                          <span className="pos-order-name" style={{ color: POS_COLORS[pi % POS_COLORS.length] }}>
+                            {pos?.name || pw.id}
+                          </span>
+                          <span className="prio-value">{idx + 1}</span>
+                          <button className="btn-remove" onClick={() => togglePos(pw.id)}>✕</button>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </>
+              )}
+              <div className="unselected-label">可选：</div>
+              <div className="unselected-list">
+                {positions.filter((p) => !workerPos.find((wp) => wp.id === p.id)).map((pos, pi) => (
+                  <span
+                    key={pos.id}
+                    className="pos-tag-clickable"
+                    style={{ borderColor: POS_COLORS[pi % POS_COLORS.length], color: POS_COLORS[pi % POS_COLORS.length] }}
+                    onClick={() => togglePos(pos.id)}
+                  >
+                    + {pos.name}
+                  </span>
+                ))}
+                {positions.filter((p) => !workerPos.find((wp) => wp.id === p.id)).length === 0 && (
+                  <span className="unselected-empty">已选择所有岗位</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="form-group">
-            <label>休息日（可多选，周六固定休息自动安排）</label>
+            <label>休息日（可多选）</label>
             <div className="checkbox-group">
               {DAY_NAMES.map((d, i) => (
                 <button key={i} type="button"
-                  className={"checkbox-btn" + (offDays.includes(i) ? " selected" : "") + (i === 5 ? " auto-off" : "")}
-                  style={i === 5 ? { borderColor: "var(--text-muted)", opacity: 0.5, cursor: "default" }
-                    : offDays.includes(i) ? { borderColor: "var(--red)", background: "var(--red-light)", color: "var(--red)" } : {}}
-                  onClick={() => i !== 5 && toggleOff(i)}>
-                  {d}{i === 5 ? " (自动)" : ""}
+                  className={"checkbox-btn" + (offDays.includes(i) ? " selected" : "")}
+                  style={offDays.includes(i) ? { borderColor: "var(--danger)", background: "var(--danger-dim)", color: "var(--danger)" } : {}}
+                  onClick={() => toggleOff(i)}
+                >
+                  {d}
                 </button>
               ))}
             </div>

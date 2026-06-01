@@ -1,6 +1,7 @@
 const WORKERS_KEY = "wd_workers";
 const POS_STORAGE_KEY = "wd_positions";
 const ORDER_STORAGE_KEY = "wd_pos_order";
+const WORKDAYS_KEY = "wd_workdays";
 
 const DEFAULT_POSITIONS = [
   { id: "pos_dt", name: "大堂", minStaff: 2, maxStaff: 2 },
@@ -11,14 +12,15 @@ const DEFAULT_POSITIONS = [
 
 let nextPosId = Date.now();
 
-/** 生成默认排序：周中岗位列表、周日岗位列表 */
-export function getDefaultOrders(positions) {
+export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+/** 生成默认排序：为每个工作日生成岗位列表 */
+export function getDefaultOrders(positions, workdays) {
   const orders = {};
-  for (let day = 0; day < 7; day++) {
-    if (day === 5) continue; // 周六跳过
+  for (const day of workdays) {
     const list = [];
     for (const pos of positions) {
-      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue; // 授权周中不需要
+      if (pos.id === "pos_sq" && day >= 0 && day <= 4) continue;
       list.push(pos.id);
     }
     orders[String(day)] = list;
@@ -26,26 +28,44 @@ export function getDefaultOrders(positions) {
   return orders;
 }
 
-export function loadOrders(positions) {
+export function loadOrders(positions, workdays) {
   try {
     const raw = localStorage.getItem(ORDER_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // 校验：每个工作日都存在且有内容
-      const valid = [0, 1, 2, 3, 4, 6].every((d) => {
+      const valid = workdays.every((d) => {
         const arr = parsed[String(d)];
         return Array.isArray(arr) && arr.length > 0;
       });
       if (valid) return parsed;
     }
   } catch {}
-  const def = getDefaultOrders(positions);
+  const def = getDefaultOrders(positions, workdays);
   saveOrders(def);
   return def;
 }
 
 export function saveOrders(orders) {
   localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
+}
+
+/** 工作日配置 */
+export function loadWorkdays() {
+  try {
+    const raw = localStorage.getItem(WORKDAYS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    }
+  } catch {}
+  // 默认周一~周五 + 周日（周六休息）
+  const def = [0, 1, 2, 3, 4, 6];
+  saveWorkdays(def);
+  return def;
+}
+
+export function saveWorkdays(workdays) {
+  localStorage.setItem(WORKDAYS_KEY, JSON.stringify(workdays));
 }
 
 export function loadPositions() {

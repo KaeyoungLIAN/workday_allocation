@@ -2,16 +2,17 @@ const DAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "
 
 /**
  * Generate a schedule for one week.
- * @param {object} config - { workers, positions, orders }
+ * @param {object} config - { workers, positions, orders, workdays }
  *   orders: { "0": ["pos_dt","pos_xj","pos_pt"], "1": [...], ... }
- * @returns {object} { [dayIndex]: { [positionId]: [workerName, ...] } }
+ *   workdays: [0,1,2,3,4]  — 哪些天是工作日
  */
 export function generateSchedule(config) {
-  const { workers, positions, orders } = config;
+  const { workers, positions, orders, workdays } = config;
   const schedule = {};
 
   for (let day = 0; day < 7; day++) {
-    if (day === 5) {
+    // 休息日不排班
+    if (!workdays.includes(day)) {
       schedule[day] = {};
       continue;
     }
@@ -33,14 +34,20 @@ export function generateSchedule(config) {
       );
 
       available.sort((a, b) => {
-        const priA = (a.positions || []).find((p) => p.id === posId)?.priority ?? 3;
-        const priB = (b.positions || []).find((p) => p.id === posId)?.priority ?? 3;
-        return priA - priB;
+        // 已弃用：下面用 withPrio 索引排序
+        return 0;
       });
 
-      const assigned = available.slice(0, pos.maxStaff);
-      assigned.forEach((w) => assignedToday.add(w.id));
-      daySchedule[posId] = assigned.map((w) => w.name);
+      // 使用个人位置列表的索引代替数字优先级
+      const withPrio = available.map((w) => {
+        const idx = (w.positions || []).findIndex((p) => p.id === posId);
+        return { w, idx: idx >= 0 ? idx : 99 };
+      });
+      withPrio.sort((a, b) => a.idx - b.idx);
+
+      const assigned = withPrio.slice(0, pos.maxStaff);
+      assigned.forEach(({ w }) => assignedToday.add(w.id));
+      daySchedule[posId] = assigned.map(({ w }) => w.name);
     }
 
     schedule[day] = daySchedule;
@@ -53,10 +60,10 @@ export function generateSchedule(config) {
  * 检查排班是否满足最低要求。
  */
 export function validateSchedule(config, schedule) {
-  const { positions, orders } = config;
+  const { positions, orders, workdays } = config;
   const warnings = [];
   for (let day = 0; day < 7; day++) {
-    if (day === 5) continue;
+    if (!workdays.includes(day)) continue;
     const order = orders?.[String(day)] || [];
     for (const posId of order) {
       const pos = positions.find((p) => p.id === posId);
