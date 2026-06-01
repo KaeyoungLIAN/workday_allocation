@@ -436,16 +436,18 @@ function PositionsView({ positions, orders, workdays, onPositionsChange, onOrder
               className="staff-input"
               type="text"
               inputMode="numeric"
-              value={pos.minStaff}
-              onChange={(e) => updatePos(i, "minStaff", e.target.value)}
+              defaultValue={pos.minStaff}
+              onBlur={(e) => updatePos(i, "minStaff", e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
             />
             <span className="label-text">最多</span>
             <input
               className="staff-input"
               type="text"
               inputMode="numeric"
-              value={pos.maxStaff}
-              onChange={(e) => updatePos(i, "maxStaff", e.target.value)}
+              defaultValue={pos.maxStaff}
+              onBlur={(e) => updatePos(i, "maxStaff", e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
             />
             <button className="btn btn-sm btn-danger" onClick={() => deletePos(i)} style={{ marginLeft: "auto" }}>删除</button>
           </div>
